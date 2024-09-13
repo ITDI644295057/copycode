@@ -1,10 +1,42 @@
+<?php
+include('../config/connect.php');
+
+$teacher_id=$_SESSION['teacher'];
+
+// ดึงข้อมูลจากฐานข้อมูล
+$sql = "SELECT login_date, login_time, ip_address, status_login FROM login_history WHERE teacher_id  = :teacher_id";
+$stmt = $condb->prepare($sql);
+$stmt->bindParam(':teacher_id', $teacher_id, PDO::PARAM_STR);
+$stmt->execute();
+$result = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// ฟังก์ชันแปลงวันที่เป็นรูปแบบไทย
+function formatThaiDate($date) {
+    $months = [
+        "01" => "มกราคม", "02" => "กุมภาพันธ์", "03" => "มีนาคม",
+        "04" => "เมษายน", "05" => "พฤษภาคม", "06" => "มิถุนายน",
+        "07" => "กรกฎาคม", "08" => "สิงหาคม", "09" => "กันยายน",
+        "10" => "ตุลาคม", "11" => "พฤศจิกายน", "12" => "ธันวาคม"
+    ];
+    $timestamp = strtotime($date);
+    $day = date('j', $timestamp);
+    $month = $months[date('m', $timestamp)];
+    $year = date('Y', $timestamp) + 543; // แปลงปี
+    return "$day $month $year";
+}
+
+function formatTime($time) {
+    return date('H:i', strtotime($time));
+}
+?>
+
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>การชำระเงินสด</title>
+    <title>ประวัติการเข้าใช้ระบบ</title>
     <!-- Bootstrap CSS -->
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome CSS -->
@@ -13,272 +45,138 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
     <!-- Custom CSS -->
     <style>
-    /* Card styles */
-    .card-custom {
-        border-color: #007bff;
-        border-radius: 0.5rem;
-        box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-        margin-bottom: 1.5rem;
-    }
-
-    .card-header-custom {
-        background-color: #000000;
-        color: #fff;
-        border-bottom: 1px solid #000000;
-    }
-
-    .form-control {
-        border-radius: 0.25rem;
-        box-shadow: none;
-    }
-
-    .form-group label {
-        font-weight: bold;
-    }
-
-    .form-group .form-control {
-        width: calc(100% - 130px);
-        /* Adjust width to fit button */
-    }
-
-    .btn-info {
-        background-color: #17a2b8;
-        border-color: #17a2b8;
-    }
-
-    .btn-info:hover {
-        background-color: #138496;
-        border-color: #117a8b;
-    }
-
-    .text-primary {
-        color: #007bff;
-    }
-
-    .form-advice ul {
-        list-style-type: disc;
-        padding-left: 1.5rem;
-    }
-
-    .card-body-custom {
-        display: flex;
-        align-items: flex-start;
-    }
-
-    .form-container {
-        flex: 2;
-        margin-right: 1rem;
-    }
-
-    .advice-container {
-        flex: 1;
-    }
-
-    .advice-card {
-        border-color: #007bff;
-        border-radius: 0.5rem;
-        box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-        margin-bottom: 1.5rem;
-    }
-
-    .advice-card .card-header {
-        background-color: #6c757d;
-        color: #fff;
-    }
-
-    /* Custom upload button styles */
-    .upload-container {
-        position: relative;
-        width: 100%;
-        max-width: 500px;
+    /* Page header style */
+    .content-header {
         margin-bottom: 1rem;
     }
 
-    .upload-button {
-        display: block;
-        width: 100%;
-        padding: 10px;
-        border: 2px dashed #007bff;
-        border-radius: 0.5rem;
-        background-color: #f8f9fa;
-        text-align: center;
-        cursor: pointer;
+    /* Card styles */
+    .usage-card {
+        margin-bottom: 1rem;
+        border-radius: .375rem;
+        border: 1px solid #dee2e6;
+        background-color: #ffffff;
+        box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.1);
+        transition: transform 0.2s;
         position: relative;
-        overflow: hidden;
     }
 
-    .upload-button:hover {
-        background-color: #e9ecef;
+    .usage-card:hover {
+        transform: scale(1.02);
     }
 
-    .upload-button input[type="file"] {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        opacity: 0;
-        cursor: pointer;
-    }
-
-    .image-preview-container {
-        position: relative;
-        width: 100%;
-        max-width: 600px;
-        margin-top: 1rem;
-        display: none;
-        /* Hide container initially */
-    }
-
-    .image-preview {
-        width: 100%;
-        height: auto;
-        border: 2px solid #007bff;
-        border-radius: 0.5rem;
-        box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-    }
-
-    .remove-preview {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background: rgba(0, 0, 0, 0.5);
-        color: #fff;
-        border: none;
-        border-radius: 50%;
-        padding: 5px;
-        cursor: pointer;
-        display: none;
-        /* Hide button initially */
-        font-size: 20px;
-    }
-
-    /* Custom button styles */
-    .input-group {
+    .usage-card-body {
+        padding: 1.25rem;
         display: flex;
         align-items: center;
     }
 
-    .input-group .form-control {
-        flex: 1;
-        border-radius: 0.25rem;
+    .usage-icon {
+        font-size: 2rem;
+        margin-right: 1rem;
+        color: #dc3545;
+        /* Red color */
     }
 
-    .fetch-button {
-        height: 40px;
-        border-top-left-radius: 0.25rem; /* Same as .form-control */
-        border-bottom-left-radius: 0.25rem;
-        margin-left: 30px;
-        border: 1px solid #ced4da;
-        /* Match border of input */
+    .usage-time {
+        font-weight: bold;
+        font-size: 1.2rem;
+        color: #6c757d;
+    }
+
+    .usage-device {
+        font-size: 1.1rem;
+        color: #495057;
+    }
+
+    .device-icon {
+        font-size: 1.5rem;
+        position: absolute;
+        right: 1rem;
+        top: 1.25rem;
+        color: #dc3545;
+        /* Blue color */
+    }
+
+    .search-box {
+        margin-top: 1rem;
+    }
+
+
+    .status-message {
+        color: green;
+        font-size: 1.3em;
+        /* ปรับขนาดข้อความใหญ่ขึ้น */
+        margin-right: 10px;
+        /* ห่างจากขอบขวา 10px */
+        margin-left: auto;
+        /* ชิดขวา */
+        margin-right: 10px;
+        /* ห่างจากขอบขวา 10px */
     }
     </style>
 </head>
 
 <body>
+    <!-- Content Wrapper -->
     <div class="content-wrapper">
+        <!-- Content Header (Page header) -->
         <section class="content-header">
             <div class="container-fluid">
                 <div class="row mb-2">
                     <div class="col-sm-6">
-                        <h1 class="text-primary">การชำระเงินสด</h1>
+                        <h1 class="text-primary">ประวัติการเข้าใช้ระบบ</h1>
                     </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="content">
-            <div class="container-fluid">
-                <div class="row">
-                    <div class="col-md-12">
-                        <div class="card card-custom">
-                            <div class="card-header card-header-custom">
-                                <h3 class="card-title">ฟอร์มชำระเงินสด</h3>
-                            </div>
-                            <div class="card-body card-body-custom">
-                                <div class="form-container">
-                                    <form id="paymentForm" method="post" action="payment_process.php"
-                                        enctype="multipart/form-data">
-                                        <!-- รหัสการลงทะเบียน -->
-                                        <div class="form-group">
-                                            <label for="registrationCode">รหัสการลงทะเบียน</label>
-                                            <div class="input-group">
-                                                <input type="text" class="form-control" id="registrationCode"
-                                                    name="registrationCode" required>
-                                                <button type="button" class="btn btn-outline-primary fetch-button"
-                                                    id="fetchRegistrationCode">
-                                                    <i class="fas fa-search"></i> ดึงข้อมูล
-                                                </button>
-                                            </div>
-                                        </div>
-
-                                        <!-- รหัสนักเรียน -->
-                                        <div class="form-group">
-                                            <label for="studentId">รหัสนักเรียน</label>
-                                            <input type="text" class="form-control" id="studentId" name="studentId"
-                                                required>
-                                        </div>
-
-                                        <!-- ชื่อ-สกุลนักเรียน -->
-                                        <div class="form-group">
-                                            <label for="studentName">ชื่อ-สกุลนักเรียน</label>
-                                            <input type="text" class="form-control" id="studentName" name="studentName"
-                                                required>
-                                        </div>
-
-                                        <!-- ชื่อผู้ทำรายการ -->
-                                        <div class="form-group">
-                                            <label for="name">ชื่อผู้ทำรายการ</label>
-                                            <input type="text" class="form-control" id="name" name="name" required>
-                                        </div>
-
-                                        <!-- หลักฐานการชำระเงิน -->
-                                        <div class="form-group upload-container">
-                                            <label for="paymentProof">อัปโหลดหลักฐานการชำระเงิน</label>
-                                            <div class="upload-button">
-                                                <input type="file" id="paymentProof" name="paymentProof"
-                                                    accept="image/*" required onchange="previewImage(event)">
-                                                <i class="fas fa-upload"></i> คลิกที่นี่เพื่ออัปโหลด
-                                            </div>
-                                        </div>
-
-                                        <!-- Image preview -->
-                                        <div id="imagePreviewContainer" class="image-preview-container">
-                                            <img id="imagePreview" class="image-preview" src="#" alt="Preview Image">
-                                            <button type="button" class="remove-preview" onclick="removePreview()">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                        </div>
-
-                                        <br>
-                                        <button type="button" class="btn btn-info" id="savePaymentButton">
-                                            บันทึกการชำระเงิน
-                                        </button>
-                                    </form>
-                                </div>
-                                <div class="advice-container">
-                                    <div class="card advice-card">
-                                        <div class="card-header">
-                                            <h4 class="card-title">คำแนะนำในการชำระเงินสด</h4>
-                                        </div>
-                                        <div class="card-body">
-                                            <ul>
-                                                <li>รหัสการลงทะเบียน: กรุณากรอกรหัสการลงทะเบียนของนักเรียน
-                                                    และกดดึงข้อมูล ข้อมูลจะดึงมาตามรหัสการลงทะเบียน</li>
-                                                <li>ชื่อผู้ทำรายการ: กรุณากรอกชื่อผู้ทำรายการชำระเงิน</li>
-                                                <li>อัปโหลดหลักฐาน: กรุณาอัปโหลดภาพหลักฐานการชำระเงินที่ชัดเจน</li>
-                                            </ul>
-                                            <p>ตัวอย่างชื่อผู้ทำรายการ: สุภารวดี ศรีสุข</p>
-                                        </div>
-                                    </div>
+                    <div class="col-sm-6">
+                        <div class="search-box">
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="search-input" placeholder="ค้นหา">
+                                <div class="input-group-append">
+                                    <span class="input-group-text"><i class="fas fa-search"></i></span>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div><!-- /.container-fluid -->
+        </section>
+
+        <!-- Main content -->
+        <section class="content">
+            <div class="container-fluid">
+                <!-- Usage history cards -->
+                <div class="row">
+                    <div class="col-12">
+                        <?php foreach ($result as $row) { 
+                            // แปลงวันที่
+                            $formattedDate = formatThaiDate($row['login_date']);
+                            $formattedTime = formatTime($row['login_time']);
+                            // ตรวจสอบ IP
+                            $ipAddress = $row['ip_address'] == '::1' ? '127.0.0.1' : $row['ip_address'];
+                        ?>
+                        <div class="usage-card card" data-date="<?php echo $formattedDate; ?>"
+                            data-time="<?php echo $formattedTime; ?>" data-ip="<?php echo $ipAddress; ?>">
+                            <div class="usage-card-body">
+                                <i class="fas fa-user-clock usage-icon"></i>
+                                <div>
+                                    <div class="usage-time">วันที่ <?php echo $formattedDate; ?> เวลา
+                                        <?php echo $formattedTime; ?> น.</div>
+                                    <div class="usage-device">IP : <?php echo $ipAddress; ?></div>
+                                </div>
+                                <div class="status-message">
+                                    สถานะ : <?php echo $row['status_login']; ?>
+                                </div>
+                            </div>
+                        </div>
+                        <?php } ?>
+                    </div>
+                </div>
             </div>
         </section>
+        <!-- /.content -->
     </div>
+    <!-- /.content-wrapper -->
+
 
     <!-- jQuery, Popper.js, and Bootstrap JS -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
@@ -287,137 +185,18 @@
     <!-- SweetAlert2 JS -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
-    function previewImage(event) {
-        const file = event.target.files[0];
-        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
-        const imagePreview = document.getElementById('imagePreview');
-        const removePreviewButton = document.querySelector('.remove-preview');
-
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                imagePreview.src = e.target.result;
-                imagePreviewContainer.style.display = 'block';
-                removePreviewButton.style.display = 'block';
-            }
-            reader.readAsDataURL(file);
-        } else {
-            imagePreview.src = '#';
-            imagePreviewContainer.style.display = 'none';
-            removePreviewButton.style.display = 'none';
-        }
-    }
-
-    function removePreview() {
-        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
-        const imagePreview = document.getElementById('imagePreview');
-        const removePreviewButton = document.querySelector('.remove-preview');
-        const fileInput = document.getElementById('paymentProof');
-
-        imagePreview.src = '#';
-        imagePreviewContainer.style.display = 'none';
-        removePreviewButton.style.display = 'none';
-        fileInput.value = '';
-    }
-
-    document.getElementById('fetchRegistrationCode').addEventListener('click', function() {
-        const registrationCode = document.getElementById('registrationCode').value.trim();
-
-        if (registrationCode !== '') {
-            fetch('../fetch/fetch_data_paycash.php', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        registrationCode: registrationCode
-                    })
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        document.getElementById('studentId').value = data.studentId;
-                        document.getElementById('studentName').value = data.studentName;
-                    } else {
-                        Swal.fire({
-                            title: 'ไม่พบข้อมูล',
-                            text: data.message || 'ไม่พบข้อมูลสำหรับรหัสการลงทะเบียนนี้',
-                            icon: 'error',
-                            confirmButtonColor: '#3085d6'
-                        });
-                        document.getElementById('registrationCode').value = '';
-                        document.getElementById('studentId').value = '';
-                        document.getElementById('studentName').value = '';
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    Swal.fire({
-                        title: 'ข้อผิดพลาด',
-                        text: 'เกิดข้อผิดพลาดในการดึงข้อมูล',
-                        icon: 'error',
-                        confirmButtonColor: '#3085d6'
-                    });
-                });
-        } else {
-            Swal.fire({
-                title: 'กรุณากรอกรหัสการลงทะเบียน',
-                text: 'คุณต้องกรอกรหัสการลงทะเบียนก่อนดึงข้อมูล',
-                icon: 'warning',
-                confirmButtonColor: '#3085d6'
+    $(document).ready(function() {
+        $('#search-input').on('input', function() {
+            var query = $(this).val().toLowerCase();
+            $('.usage-card').each(function() {
+                var dateText = $(this).data('date').toLowerCase();
+                var timeText = $(this).data('time').toLowerCase();
+                var ipText = $(this).data('ip').toLowerCase();
+                var match = dateText.indexOf(query) !== -1 || timeText.indexOf(query) !== -1 ||
+                    ipText.indexOf(query) !== -1;
+                $(this).toggle(match);
             });
-        }
-    });
-
-    document.getElementById('savePaymentButton').addEventListener('click', function(e) {
-        e.preventDefault();
-
-        const fileInput = document.getElementById('paymentProof');
-        if (!fileInput.files.length) {
-            Swal.fire({
-                title: 'กรุณาอัปโหลดหลักฐานการชำระเงิน',
-                icon: 'warning',
-                confirmButtonText: 'ตกลง'
-            });
-            return;
-        }
-
-        // Create FormData object
-        const formData = new FormData(document.getElementById('paymentForm'));
-
-        fetch('../fetch/payment_process.php', {
-                method: 'POST',
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    Swal.fire({
-                        title: data.success,
-                        icon: 'success',
-                        confirmButtonText: 'ตกลง'
-                    }).then((result) => {
-                        if (result.isConfirmed) {
-                            window.location.href = '../mainadmin/index.php';
-                        }
-                    });
-                } else if (data.error) {
-                    Swal.fire({
-                        title: 'ข้อผิดพลาด',
-                        text: data.error,
-                        icon: 'error',
-                        confirmButtonText: 'ตกลง'
-                    });
-                }
-            })
-            .catch(error => {
-                Swal.fire({
-                    title: 'ข้อผิดพลาด',
-                    text: 'เกิดข้อผิดพลาดในการเชื่อมต่อกับเซิร์ฟเวอร์',
-                    icon: 'error',
-                    confirmButtonText: 'ตกลง'
-                });
-            });
+        });
     });
     </script>
 </body>
