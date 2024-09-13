@@ -1,296 +1,56 @@
-<!-- Content Wrapper. Contains page content -->
-<div class="content-wrapper">
-    <!-- Content Header (Page header) -->
-    <div class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <!-- Dashboard title removed -->
-                </div><!-- /.col -->
-                <div class="col-sm-6 text-right" style="padding-right: 15px;">
-                    <br>
-                    <h1 class="m-0" id="currentDateTime"></h1>
-                </div><!-- /.col -->
-            </div><!-- /.row -->
-        </div><!-- /.container-fluid -->
-    </div>
-    <!-- /.content-header -->
+<?php
+header('Content-Type: application/json');
 
-    <!-- Image placed below date and time -->
-    <div class="text-center mb-4">
-        <img src="../assets/dist/img/header.png" alt="Header Image" style="max-width: 100%; height: auto;">
-    </div>
+// เชื่อมต่อกับฐานข้อมูล
+require_once('../config/connect.php');
 
-    <!-- Main content -->
-    <section class="content">
-        <div class="container-fluid">
-            <!-- Small boxes (Stat box) -->
-            <div class="row">
-                <!-- Small boxes (statistic) -->
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-success">
-                        <div class="inner">
-                            <h3 id="total-deposits" class="large-text">0</h3>
-                            <p class="medium-text">จำนวนนักศึกษาทั้งหมด(คน)</p>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-user-graduate"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-danger">
-                        <div class="inner">
-                            <h3 id="total-withdrawals" class="large-text">0</h3>
-                            <p class="medium-text">จำนวนนักศึกษาลงทะเบียน(คน)</p>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-clipboard-list"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-warning">
-                        <div class="inner">
-                            <h3 id="total-borrowings" class="large-text">0</h3>
-                            <p class="medium-text">จำนวนนักศึกษาชำระเงิน(คน)</p>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-money-check-alt"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-info">
-                        <div class="inner">
-                            <h3 id="total-balance" class="large-text">0</h3>
-                            <p class="medium-text">จำนวนเงินชำระค่าเทอม(บาท)</p>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-dollar-sign"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
+try {
+    // ฟังก์ชันสำหรับดึงข้อมูล
+    function fetchData($query, $connection) {
+        $stmt = $connection->prepare($query);
+        $stmt->execute();
+        return $stmt->fetch(PDO::FETCH_ASSOC);
+    }
 
-            <!-- Statistics Section with Chart.js -->
-            <div class="container-fluid mt-4">
-                <div class="row">
-                    <!-- First chart -->
-                    <div class="col-lg-6 col-md-12">
-                        <div class="card" style="height: 100%;">
-                            <div class="card-body">
-                                <h3 class="card-title text-center" id="studentChartTitle">กราฟนักศึกษาลงทะเบียน</h3>
+    // Query 1: จำนวนนักศึกษาทั้งหมด
+    $query1 = "SELECT COUNT(*) AS total_students FROM student";
+    $total_students = fetchData($query1, $condb);
 
-                                <!-- Dropdown for academic year -->
-                                <label for="academicYear">เลือกปีการศึกษา:</label>
-                                <select id="academicYear" onchange="updateChart()">
-                                    <option value="2567">2567</option>
-                                    <option value="2568">2568</option>
-                                    <option value="2569">2569</option>
-                                </select>
-                                <!-- Chart canvas -->
-                                <canvas id="studentChart" style="width: 100%; height: 400px;"></canvas>
-                            </div>
-                        </div>
-                    </div>
+    // Query 2: จำนวนนักศึกษาลงทะเบียน
+    $query2 = "SELECT COUNT(DISTINCT r.student_id) AS total_registered_students
+               FROM registration r
+               JOIN student s ON r.student_id = s.student_id
+               WHERE r.registration_status = 'succeed'";
+    $total_registered_students = fetchData($query2, $condb);
 
-                    <!-- Second chart -->
-                    <div class="col-lg-6 col-md-12">
-                        <div class="card" style="height: 100%;">
-                            <div class="card-body">
-                                <h5 class="card-title text-center">กราฟการชำระค่าเทอม</h5>
-                                <canvas id="paymentChart" style="width: 100%; height: 400px;"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    // Query 3: จำนวนนักศึกษาชำระเงิน
+    $query3 = "SELECT COUNT(DISTINCT student.student_id) AS total_students_paid
+               FROM student
+               JOIN registration ON student.student_id = registration.student_id
+               JOIN tuition_payment_slip ON registration.registration_id = tuition_payment_slip.registration_id
+               JOIN payment ON tuition_payment_slip.tuition_payment_slip_number = payment.tuition_payment_slip_number
+               WHERE payment.payment_status = 'succeed'";
+    $total_students_paid = fetchData($query3, $condb);
 
-            <!-- Summary Card for Recent Activities -->
-            <div class="row">
-                <div class="col-lg-12">
-                    <div class="card" style="margin-top: 30px;">
-                        <div class="card-header">
-                            <h3 class="card-title">ข้อมูลการชำระเงินภาคเรียนที่ 1 ปีการศึกษา 2567<span id="recentDate"></span> </h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="row text-center">
-                                <div class="col-md-4">
-                                    <h5 class="font-weight-bold" style="color: rgba(255, 99, 132, 1);">จำนวนนักศึกษาที่โอนผ่านธนาคาร</h5>
-                                    <h3 id="recent-deposits" class="font-size-lg">0 คน</h3>
-                                </div>
-                                <div class="col-md-4">
-                                    <h5 class="font-weight-bold" style="color: rgba(54, 162, 235, 1);">จำนวนนักศึกษาที่ผ่อนชำระ</h5>
-                                    <h3 id="recent-withdrawals" class="font-size-lg">0 คน</h3>
-                                </div>
-                                <div class="col-md-4">
-                                    <h5 class="font-weight-bold" style="color: rgba(0, 128, 0, 1);">จำนวนนักศึกษาที่ชำระเงินสด</h5>
-                                    <h3 id="recent-borrowings" class="font-size-lg">0 คน</h3>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    // Query 4: จำนวนเงินชำระค่าเทอม
+    $query4 = "SELECT SUM(DISTINCT tuition_payment_slip.total_money) AS total_tuition_paid
+               FROM tuition_payment_slip
+               JOIN payment ON tuition_payment_slip.tuition_payment_slip_number = payment.tuition_payment_slip_number
+               WHERE payment.payment_status = 'succeed'";
+    $total_tuition_paid = fetchData($query4, $condb);
 
-            <!-- /.content-wrapper -->
+    // ส่งข้อมูลเป็น JSON
+    echo json_encode([
+        'total_students' => $total_students['total_students'],
+        'total_registered_students' => $total_registered_students['total_registered_students'],
+        'total_students_paid' => $total_students_paid['total_students_paid'],
+        'total_tuition_paid' => $total_tuition_paid['total_tuition_paid']
+    ]);
 
-            <!-- Add this script tag at the end of your body tag -->
-            <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-            <script>
-            // Data and functions for the page
+} catch (PDOException $e) {
+    echo json_encode(['error' => $e->getMessage()]);
+}
 
-            // Format date in Thai
-            function formatDateThai(date) {
-                const monthsThai = [
-                    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-                    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
-                ];
-                const day = date.getDate();
-                const month = monthsThai[date.getMonth()];
-                const year = date.getFullYear() + 543; // Convert to Buddhist year
-                const hours = date.getHours().toString().padStart(2, '0');
-                const minutes = date.getMinutes().toString().padStart(2, '0');
-                const seconds = date.getSeconds().toString().padStart(2, '0');
-                return `${day} ${month} ${year} ${hours}:${minutes}:${seconds}`;
-            }
-
-            function updateDateTime() {
-                const now = new Date();
-                document.getElementById('currentDateTime').innerText = formatDateThai(now);
-            }
-
-            // Update date and time every second
-            setInterval(updateDateTime, 1000);
-            // Set initial date and time
-            updateDateTime();
-
-            // Chart data
-            const registrationData = {
-                '2567': {
-                    '1': [180, 220, 240, 140, 80],
-                    '2': [160, 200, 220, 130, 90]
-                },
-                '2568': {
-                    '1': [200, 300, 250, 150, 100],
-                    '2': [180, 280, 230, 140, 110]
-                },
-                '2569': {
-                    '1': [210, 320, 260, 160, 120],
-                    '2': [190, 300, 240, 150, 115]
-                }
-            };
-
-            // Create initial student chart
-            const ctx = document.getElementById('studentChart').getContext('2d');
-            const studentChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: ['ปวช.1', 'ปวช.2', 'ปวช.3', 'ปวส.1', 'ปวส.2'],
-                    datasets: [{
-                        label: 'ภาคเรียนที่ 1',
-                        data: registrationData['2567']['1'],
-                        backgroundColor: 'rgba(255, 45, 33, 0.6)',
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        borderWidth: 1
-                    }, {
-                        label: 'ภาคเรียนที่ 2',
-                        data: registrationData['2567']['2'],
-                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'ระดับชั้นปี'
-                            }
-                        },
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'นักศึกษา (คน)'
-                            }
-                        }
-                    }
-                }
-            });
-
-            // Update chart data based on dropdown selection
-            function updateChart() {
-                const selectedYear = document.getElementById('academicYear').value;
-                studentChart.data.datasets[0].data = registrationData[selectedYear]['1'];
-                studentChart.data.datasets[1].data = registrationData[selectedYear]['2'];
-                studentChart.options.plugins.title.text = 'กราฟนักศึกษาลงทะเบียน ปีการศึกษา ' + selectedYear;
-                studentChart.update();
-            }
-
-            // Add event listener to dropdown
-            document.getElementById('academicYear').addEventListener('change', updateChart);
-            // Initial chart setup
-            updateChart();
-
-            // Create payment chart
-            const ctx2 = document.getElementById('paymentChart').getContext('2d');
-            const paymentChart = new Chart(ctx2, {
-                type: 'line',
-                data: {
-                    labels: ['ปีการศึกษา 2567', 'ปีการศึกษา 2568', 'ปีการศึกษา 2569', 'ปีการศึกษา 2570'],
-                    datasets: [{
-                        label: 'โอนผ่านธนาคาร',
-                        data: [40000, 41050, 45000, 43500],
-                        backgroundColor: 'rgba(255, 99, 132, 1)',
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        borderWidth: 1
-                    }, {
-                        label: 'ผ่อนชำระ',
-                        data: [23120, 13350, 14880, 16330],
-                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 1
-                    }, {
-                        label: 'ชำระเงินสด',
-                        data: [31050, 33500, 36000, 39000],
-                        backgroundColor: 'rgba(0, 255, 0, 0.6)',
-                        borderColor: 'rgba(0, 255, 0, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'ปีการศึกษา'
-                            }
-                        },
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'จำนวนเงิน(บาท)'
-                            }
-                        }
-                    }
-                }
-            });
-
-            // Fetch and update statistics
-            $(document).ready(function() {
-                $.getJSON('../fetch/fetch_values_data.php', function(data) {
-                    $('#total-deposits').text(Number(data.total_students).toLocaleString());
-                    $('#total-withdrawals').text(Number(data.total_registered_students).toLocaleString());
-                    $('#total-borrowings').text(Number(data.total_students_paid).toLocaleString());
-                    $('#total-balance').text(Number(data.total_tuition_paid).toLocaleString());
-                });
-            });
-            </script>
-        </div><!-- /.container-fluid -->
-    </section><!-- /.content -->
-</div><!-- /.content-wrapper -->
+// ปิดการเชื่อมต่อ
+$condb = null;
+?>
