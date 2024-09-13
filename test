@@ -1,418 +1,296 @@
-<?php
-// Start output buffering
-ob_start();
-
-include '../config/connect.php';
-
-// Handle POST request for updating payment status
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['studentId'])) {
-    $studentId = $_POST['studentId'];
-
-    try {
-        $sql = "UPDATE payment p
-                JOIN tuition_payment_slip tps ON p.tuition_payment_slip_number = tps.tuition_payment_slip_number
-                JOIN registration r ON tps.registration_id = r.registration_id
-                SET p.payment_status = 'succeed'
-                WHERE r.student_id = :studentId";
-
-        $stmt = $condb->prepare($sql);
-        $stmt->bindParam(':studentId', $studentId, PDO::PARAM_INT);
-        $stmt->execute();
-
-        echo json_encode(['success' => true]);
-    } catch (PDOException $e) {
-        echo json_encode(['error' => $e->getMessage()]);
-    }
-    ob_end_flush();
-    exit;
-}
-
-// Fetch data for display
-try {
-    $sql = "SELECT
-                r.registration_id AS registrationId,
-                s.student_id AS studentId,
-                s.name AS studentName,
-                tps.total_money AS tuitionFee,
-                p.lister AS processorName,
-                p.money_type AS paymentType,
-                p.payment_proof AS paymentProof,
-                p.payment_status AS paymentStatus
-            FROM
-                student s
-            JOIN
-                registration r ON s.student_id = r.student_id
-            JOIN
-                tuition_payment_slip tps ON r.registration_id = tps.registration_id
-            JOIN
-                payment p ON tps.tuition_payment_slip_number = p.tuition_payment_slip_number";
-
-    $stmt = $condb->prepare($sql);
-    $stmt->execute();
-    $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {
-    $results = ["error" => $e->getMessage()];
-}
-
-ob_end_flush();
-?>
-
-<!DOCTYPE html>
-<html lang="th">
-
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>จัดการค่าเทอม</title>
-    <!-- Bootstrap CSS -->
-
-    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome CSS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
-    <!-- SweetAlert2 CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-    <!-- DataTables CSS -->
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.21/css/jquery.dataTables.min.css">
-    <link rel="stylesheet" href="https://code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
-
-    <!-- Custom CSS -->
-    <style>
-    .btn-confirm {
-        background-color: #28a745;
-        /* สีเขียว */
-        border-color: #28a745;
-        /* สีเขียว */
-        color: #fff;
-        /* ข้อความสีขาว */
-    }
-
-    .btn-confirm i {
-        margin-right: 5px;
-        /* เว้นระยะระหว่างไอคอนกับข้อความ */
-    }
-
-    .btn-confirm:hover {
-        background-color: #99FF33;
-        /* สีเขียวอ่อน */
-        border-color: #99FF33;
-        /* สีเขียวอ่อน */
-    }
-
-    .btn-waiting {
-        background-color: #CC3300;
-        /* สีส้มเข้ม */
-        border-color: #CC3300;
-        /* สีส้มเข้ม */
-        color: #fff;
-        /* ข้อความสีขาว */
-    }
-
-
-    .btn-waiting i {
-        margin-right: 5px;
-        /* เว้นระยะระหว่างไอคอนกับข้อความ */
-    }
-
-    .btn-waiting:hover {
-        background-color: #e0a800;
-        /* สีเหลืองเข้ม */
-        border-color: #d39e00;
-        /* สีเหลืองเข้ม */
-    }
-
-    .result-table-card {
-        margin-top: 1rem;
-        border-radius: .375rem;
-        border: 1px solid #dee2e6;
-        background-color: #ffffff;
-        box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.1);
-    }
-
-    .status-icon {
-        display: inline-block;
-        width: 20px;
-        height: 20px;
-        border-radius: 50%;
-        margin-right: 5px;
-    }
-
-    .status-pending {
-        background-color: #dc3545;
-        /* สีแดง */
-    }
-
-    .status-cash {
-        background-color: #28a745;
-        /* สีเขียว */
-    }
-
-    .status-qr {
-        background-color: #17a2b8;
-        /* สีฟ้าอมเขียว */
-    }
-
-    .btn-view-proof {
-        background-color: #007bff;
-        /* สีน้ำเงิน */
-        border-color: #007bff;
-        /* สีน้ำเงิน */
-        color: #fff;
-        /* ข้อความสีขาว */
-    }
-
-    .btn-view-proof:hover {
-        background-color: #0056b3;
-        /* สีน้ำเงินเข้ม */
-        border-color: #004085;
-        /* สีน้ำเงินเข้ม */
-    }
-
-    .btn-disabled {
-        background-color: #6c757d;
-        /* สีเทา */
-        border-color: #6c757d;
-        /* สีเทา */
-        color: #fff;
-        /* ข้อความสีขาว */
-        cursor: not-allowed;
-        /* ลูกศรไม่สามารถคลิกได้ */
-    }
-
-    /* Payment Confirmed Button */
-    .btn-confirmed {
-        background-color: #6c757d;
-        /* Gray */
-        border-color: #6c757d;
-        /* Gray */
-        color: #fff;
-        /* White text */
-    }
-
-    .btn-confirmed i {
-        margin-right: 5px;
-        /* Space between icon and text */
-    }
-    </style>
-</head>
-
-
-<body>
-    <!-- Content Wrapper. Contains page content -->
-    <div class="content-wrapper">
-        <!-- Content Header (Page header) -->
-        <section class="content-header">
-            <div class="container-fluid">
-                <div class="row mb-2">
-                    <div class="col-sm-6">
-                        <h1 class="text-primary">ยืนยันการชำระเงิน</h1>
-                    </div>
-                </div>
-            </div><!-- /.container-fluid -->
-        </section>
-        <!-- Main content -->
-        <section class="content">
-            <div class="container-fluid">
-                <div class="row">
-                    <div class="col-12">
-                        <!-- Tuition Management Table Card -->
-                        <div class="result-table-card card">
-                            <div class="card-body">
-                                <table id="resultTable" class="table table-bordered table-striped table-hover">
-                                    <thead class="thead-dark">
-                                        <tr>
-                                            <th width="10%" class='text-center'>รหัสการลงทะเบียน</th>
-                                            <th width="10%" class='text-center'>รหัสนักเรียน</th>
-                                            <th width="15%" class='text-center'>ชื่อ-นามสกุล</th>
-                                            <th width="5%" class='text-center'>ค่าเทอม (บาท)</th>
-                                            <th width="15%" class='text-center'>ผู้ทำรายการ</th>
-                                            <th width="15%" class='text-center'>ประเภทการชำระเงิน</th>
-                                            <th width="10%" class='text-center'>หลักฐานการชำระเงิน</th>
-                                            <th width="15%" class='text-center'>สถานะการชำระเงิน</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="studentTableBody">
-                                        <?php foreach ($results as $student): ?>
-                                        <?php
-                                                // แปลงประเภทการชำระเงินเป็นภาษาไทยและกำหนดสี
-                                                $paymentTypeTranslated = '';
-                                                $statusClass = '';
-                                               
-                                                switch (strtolower($student['paymentType'])) {
-                                                    case 'cash payment':
-                                                        $paymentTypeTranslated = 'ชำระเงินสด';
-                                                        $statusClass = 'status-cash';
-                                                        break;
-                                                    case 'bank transfer':
-                                                        $paymentTypeTranslated = 'โอนเงินผ่านธนาคาร';
-                                                        $statusClass = 'status-qr';
-                                                        break;
-                                                    default:
-                                                        $paymentTypeTranslated = $student['paymentType'];
-                                                        $statusClass = 'status-pending';
-                                                        break;
-                                                }
-                                                $actionButton = strtolower($student['paymentStatus']) === 'approval' 
-                                                ? '<button type="button" class="btn btn-confirm btn-sm confirm-btn" data-student-id="'.$student['studentId'].'">
-                                                <i class="fas fa-check"></i> ยืนยันการชำระเงิน</button>'
-                                                : '<button type="button" class="btn btn-confirmed btn-sm confirm-btn" disabled>
-                                                <i class="fas fa-check"></i> ยืนยันการชำระเงินสำเร็จ</button>';
-                                            ?>
-                                        <tr>
-                                            <td class='text-center'><?= htmlspecialchars($student['registrationId']) ?>
-                                            </td>
-                                            <td class='text-center'><?= htmlspecialchars($student['studentId']) ?></td>
-                                            <td class='text-center'><?= htmlspecialchars($student['studentName']) ?>
-                                            </td>
-                                            <td class='text-center'><?= htmlspecialchars($student['tuitionFee']) ?></td>
-                                            <td class='text-center'><?= htmlspecialchars($student['processorName']) ?>
-                                            </td>
-                                            <td class='text-center'>
-                                                <span class="status-icon <?= $statusClass ?>"></span>
-                                                <?= htmlspecialchars($paymentTypeTranslated) ?>
-                                            </td>
-                                            <td class='text-center'>
-                                                <?php if (!empty($student['paymentProof'])): ?>
-                                                <button type="button" class="btn btn-view-proof btn-sm view-proof-btn"
-                                                    data-payment-proof="<?= htmlspecialchars($student['paymentProof']) ?>">
-                                                    ดูหลักฐาน
-                                                </button>
-                                                <?php else: ?>
-                                                <button type="button" class="btn btn-disabled btn-sm" disabled>
-                                                    ไม่มีหลักฐาน
-                                                </button>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td class='text-center'>
-                                                <?= $actionButton ?>
-                                            </td>
-                                        </tr>
-                                        <?php endforeach; ?>
-                                    </tbody>
-                                </table>
-                            </div>
-                            <!-- /.card-body -->
-                        </div>
-                        <!-- /.card -->
-                    </div>
-                    <!-- /.col -->
-                </div>
-                <!-- /.row -->
-            </div>
-            <!-- /.container-fluid -->
-        </section>
-        <!-- /.content -->
+<!-- Content Wrapper. Contains page content -->
+<div class="content-wrapper">
+    <!-- Content Header (Page header) -->
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <!-- Dashboard title removed -->
+                </div><!-- /.col -->
+                <div class="col-sm-6 text-right" style="padding-right: 15px;">
+                    <br>
+                    <h1 class="m-0" id="currentDateTime"></h1>
+                </div><!-- /.col -->
+            </div><!-- /.row -->
+        </div><!-- /.container-fluid -->
     </div>
-    <!-- /.content-wrapper -->
+    <!-- /.content-header -->
 
-    <!-- Bootstrap, jQuery, and DataTables JavaScript -->
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.1/dist/umd/popper.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-    <script src="https://cdn.datatables.net/1.10.21/js/jquery.dataTables.min.js"></script>
-    <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
-    <!-- jQuery -->
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <!-- SweetAlert2 JavaScript -->
+    <!-- Image placed below date and time -->
+    <div class="text-center mb-4">
+        <img src="../assets/dist/img/header.png" alt="Header Image" style="max-width: 100%; height: auto;">
+    </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- Main content -->
+    <section class="content">
+        <div class="container-fluid">
+            <!-- Small boxes (Stat box) -->
+            <div class="row">
+                <!-- Small boxes (statistic) -->
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-success">
+                        <div class="inner">
+                            <h3 id="total-deposits" class="large-text">0</h3>
+                            <p class="medium-text">จำนวนนักศึกษาทั้งหมด(คน)</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-user-graduate"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-danger">
+                        <div class="inner">
+                            <h3 id="total-withdrawals" class="large-text">0</h3>
+                            <p class="medium-text">จำนวนนักศึกษาลงทะเบียน(คน)</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-clipboard-list"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-warning">
+                        <div class="inner">
+                            <h3 id="total-borrowings" class="large-text">0</h3>
+                            <p class="medium-text">จำนวนนักศึกษาชำระเงิน(คน)</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-money-check-alt"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-info">
+                        <div class="inner">
+                            <h3 id="total-balance" class="large-text">0</h3>
+                            <p class="medium-text">จำนวนเงินชำระค่าเทอม(บาท)</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-    <script>
-    // ปรับปรุง JavaScript
-    $(document).ready(function() {
-        $('#resultTable').DataTable();
+            <!-- Statistics Section with Chart.js -->
+            <div class="container-fluid mt-4">
+                <div class="row">
+                    <!-- First chart -->
+                    <div class="col-lg-6 col-md-12">
+                        <div class="card" style="height: 100%;">
+                            <div class="card-body">
+                                <h3 class="card-title text-center" id="studentChartTitle">กราฟนักศึกษาลงทะเบียน</h3>
 
-        $('.confirm-btn').on('click', function() {
-            const button = $(this);
-            const studentId = button.data('student-id');
-            console.log("Student ID:", studentId); // Debugging
+                                <!-- Dropdown for academic year -->
+                                <label for="academicYear">เลือกปีการศึกษา:</label>
+                                <select id="academicYear" onchange="updateChart()">
+                                    <option value="2567">2567</option>
+                                    <option value="2568">2568</option>
+                                    <option value="2569">2569</option>
+                                </select>
+                                <!-- Chart canvas -->
+                                <canvas id="studentChart" style="width: 100%; height: 400px;"></canvas>
+                            </div>
+                        </div>
+                    </div>
 
-            Swal.fire({
-                title: 'ยืนยันการชำระเงิน',
-                text: "คุณต้องการยืนยันการชำระเงินหรือไม่?",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#3085d6',
-                cancelButtonColor: '#d33',
-                confirmButtonText: 'ยืนยัน',
-                cancelButtonText: 'ยกเลิก'
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    $.ajax({
-                        type: 'POST',
-                        url: window.location.href, // Ensure the URL is correct
-                        data: {
-                            studentId: studentId
-                        },
-                        success: function(response) {
-                            try {
-                                const res = JSON.parse(response);
-                                if (res.success) {
-                                    Swal.fire(
-                                        'สำเร็จ!',
-                                        'การชำระเงินได้รับการยืนยันเรียบร้อยแล้ว',
-                                        'success'
-                                    ).then(() => {
-                                        button.html('<i class="fas fa-check"></i> ยืนยันการชำระเงินสำเร็จ').removeClass('btn-confirm').addClass('btn-confirmed').prop('disabled', true);
-                                    });
-                                } else {
-                                    // Only log error in console, not shown to user
-                                    console.error('Error:', res.error);
-                                    Swal.fire(
-                                        'ผิดพลาด!',
-                                        'ไม่สามารถยืนยันการชำระเงินได้',
-                                        'error'
-                                    );
-                                }
-                            } catch (e) {
-                                // Log parsing errors to console, but show success message
-                                console.error("JSON Parsing Error:", e);
-                                Swal.fire(
-                                    'สำเร็จ!',
-                                    'การชำระเงินได้รับการยืนยันเรียบร้อยแล้ว',
-                                    'success'
-                                ).then(() => {
-                                    button.html('<i class="fas fa-check"></i> ยืนยันการชำระเงินสำเร็จ').removeClass('btn-confirm').addClass('btn-confirmed').prop('disabled', true);
+                    <!-- Second chart -->
+                    <div class="col-lg-6 col-md-12">
+                        <div class="card" style="height: 100%;">
+                            <div class="card-body">
+                                <h5 class="card-title text-center">กราฟการชำระค่าเทอม</h5>
+                                <canvas id="paymentChart" style="width: 100%; height: 400px;"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-                                });
+            <!-- Summary Card for Recent Activities -->
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="card" style="margin-top: 30px;">
+                        <div class="card-header">
+                            <h3 class="card-title">ข้อมูลการชำระเงินภาคเรียนที่ 1 ปีการศึกษา 2567<span id="recentDate"></span> </h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-md-4">
+                                    <h5 class="font-weight-bold" style="color: rgba(255, 99, 132, 1);">จำนวนนักศึกษาที่โอนผ่านธนาคาร</h5>
+                                    <h3 id="recent-deposits" class="font-size-lg">0 คน</h3>
+                                </div>
+                                <div class="col-md-4">
+                                    <h5 class="font-weight-bold" style="color: rgba(54, 162, 235, 1);">จำนวนนักศึกษาที่ผ่อนชำระ</h5>
+                                    <h3 id="recent-withdrawals" class="font-size-lg">0 คน</h3>
+                                </div>
+                                <div class="col-md-4">
+                                    <h5 class="font-weight-bold" style="color: rgba(0, 128, 0, 1);">จำนวนนักศึกษาที่ชำระเงินสด</h5>
+                                    <h3 id="recent-borrowings" class="font-size-lg">0 คน</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- /.content-wrapper -->
+
+            <!-- Add this script tag at the end of your body tag -->
+            <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script>
+            // Data and functions for the page
+
+            // Format date in Thai
+            function formatDateThai(date) {
+                const monthsThai = [
+                    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+                    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+                ];
+                const day = date.getDate();
+                const month = monthsThai[date.getMonth()];
+                const year = date.getFullYear() + 543; // Convert to Buddhist year
+                const hours = date.getHours().toString().padStart(2, '0');
+                const minutes = date.getMinutes().toString().padStart(2, '0');
+                const seconds = date.getSeconds().toString().padStart(2, '0');
+                return `${day} ${month} ${year} ${hours}:${minutes}:${seconds}`;
+            }
+
+            function updateDateTime() {
+                const now = new Date();
+                document.getElementById('currentDateTime').innerText = formatDateThai(now);
+            }
+
+            // Update date and time every second
+            setInterval(updateDateTime, 1000);
+            // Set initial date and time
+            updateDateTime();
+
+            // Chart data
+            const registrationData = {
+                '2567': {
+                    '1': [180, 220, 240, 140, 80],
+                    '2': [160, 200, 220, 130, 90]
+                },
+                '2568': {
+                    '1': [200, 300, 250, 150, 100],
+                    '2': [180, 280, 230, 140, 110]
+                },
+                '2569': {
+                    '1': [210, 320, 260, 160, 120],
+                    '2': [190, 300, 240, 150, 115]
+                }
+            };
+
+            // Create initial student chart
+            const ctx = document.getElementById('studentChart').getContext('2d');
+            const studentChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['ปวช.1', 'ปวช.2', 'ปวช.3', 'ปวส.1', 'ปวส.2'],
+                    datasets: [{
+                        label: 'ภาคเรียนที่ 1',
+                        data: registrationData['2567']['1'],
+                        backgroundColor: 'rgba(255, 45, 33, 0.6)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }, {
+                        label: 'ภาคเรียนที่ 2',
+                        data: registrationData['2567']['2'],
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'ระดับชั้นปี'
                             }
                         },
-                        error: function(xhr, status, error) {
-                            // Log AJAX errors to console, but show success message
-                            console.error("AJAX Error:", status, error);
-                            Swal.fire(
-                                'สำเร็จ!',
-                                'การชำระเงินได้รับการยืนยันเรียบร้อยแล้ว',
-                                'success'
-                            ).then(() => {
-                                button.html('<i class="fas fa-check"></i> ยืนยันการชำระเงินสำเร็จ').removeClass('btn-confirm').addClass('btn-confirmed').prop('disabled', true);
-
-                            });
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'นักศึกษา (คน)'
+                            }
                         }
-                    });
+                    }
                 }
             });
-        });
 
-        $('.view-proof-btn').on('click', function() {
-            const proofUrl = '../assets/dist/img/' + $(this).data('payment-proof'); // Prepend the path
-            if (proofUrl) {
-                Swal.fire({
-                    title: 'หลักฐานการชำระเงิน',
-                    html: `
-                <img src="${proofUrl}" alt="Payment Proof" style="width: 100%; max-width: 400px; height: auto; margin-top: 10px;">
-            `,
-                    confirmButtonText: 'OK'
-                });
-            } else {
-                Swal.fire({
-                    title: 'ไม่มีหลักฐานการชำระเงิน',
-                    icon: 'info',
-                    confirmButtonText: 'OK'
-                });
+            // Update chart data based on dropdown selection
+            function updateChart() {
+                const selectedYear = document.getElementById('academicYear').value;
+                studentChart.data.datasets[0].data = registrationData[selectedYear]['1'];
+                studentChart.data.datasets[1].data = registrationData[selectedYear]['2'];
+                studentChart.options.plugins.title.text = 'กราฟนักศึกษาลงทะเบียน ปีการศึกษา ' + selectedYear;
+                studentChart.update();
             }
-        });
-    });
-    </script>
-</body>
 
-</html>
+            // Add event listener to dropdown
+            document.getElementById('academicYear').addEventListener('change', updateChart);
+            // Initial chart setup
+            updateChart();
+
+            // Create payment chart
+            const ctx2 = document.getElementById('paymentChart').getContext('2d');
+            const paymentChart = new Chart(ctx2, {
+                type: 'line',
+                data: {
+                    labels: ['ปีการศึกษา 2567', 'ปีการศึกษา 2568', 'ปีการศึกษา 2569', 'ปีการศึกษา 2570'],
+                    datasets: [{
+                        label: 'โอนผ่านธนาคาร',
+                        data: [40000, 41050, 45000, 43500],
+                        backgroundColor: 'rgba(255, 99, 132, 1)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }, {
+                        label: 'ผ่อนชำระ',
+                        data: [23120, 13350, 14880, 16330],
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }, {
+                        label: 'ชำระเงินสด',
+                        data: [31050, 33500, 36000, 39000],
+                        backgroundColor: 'rgba(0, 255, 0, 0.6)',
+                        borderColor: 'rgba(0, 255, 0, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'ปีการศึกษา'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'จำนวนเงิน(บาท)'
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Fetch and update statistics
+            $(document).ready(function() {
+                $.getJSON('../fetch/fetch_values_data.php', function(data) {
+                    $('#total-deposits').text(Number(data.total_students).toLocaleString());
+                    $('#total-withdrawals').text(Number(data.total_registered_students).toLocaleString());
+                    $('#total-borrowings').text(Number(data.total_students_paid).toLocaleString());
+                    $('#total-balance').text(Number(data.total_tuition_paid).toLocaleString());
+                });
+            });
+            </script>
+        </div><!-- /.container-fluid -->
+    </section><!-- /.content -->
+</div><!-- /.content-wrapper -->
