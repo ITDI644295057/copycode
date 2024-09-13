@@ -1,428 +1,461 @@
-<?php
-require_once '../config/connect.php';
-
-$data = [
-    'registration_id' => '',
-    'student_id' => '',
-    'name' => ''
-];
-
-$student_id = isset($_SESSION['student']) ? $_SESSION['student'] : null;
-
-if ($student_id) {
-    $sql = "SELECT r.registration_id, s.student_id, s.name 
-            FROM registration r
-            JOIN student s ON r.student_id = s.student_id
-            WHERE s.student_id = :student_id";
-    $stmt = $condb->prepare($sql);
-    $stmt->bindParam(':student_id', $student_id, PDO::PARAM_INT);
-    $stmt->execute();
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($result) {
-        $data = [
-            'registration_id' => $result['registration_id'],
-            'student_id' => $result['student_id'],
-            'name' => $result['name']
-        ];
-
-        $registration_id = $result['registration_id'];
-        $sql_payment_slip = "SELECT tuition_payment_slip_number 
-                             FROM tuition_payment_slip 
-                             WHERE registration_id = :registration_id";
-        $stmt_payment_slip = $condb->prepare($sql_payment_slip);
-        $stmt_payment_slip->bindParam(':registration_id', $registration_id, PDO::PARAM_INT);
-        $stmt_payment_slip->execute();
-        $payment_slip_result = $stmt_payment_slip->fetch(PDO::FETCH_ASSOC);
-
-        if ($payment_slip_result) {
-            $tuition_payment_slip_number = $payment_slip_result['tuition_payment_slip_number'];
-
-            $sql_check = "SELECT COUNT(*) FROM payment WHERE tuition_payment_slip_number = :tuition_payment_slip_number";
-            $stmt_check = $condb->prepare($sql_check);
-            $stmt_check->bindParam(':tuition_payment_slip_number', $tuition_payment_slip_number, PDO::PARAM_STR);
-            $stmt_check->execute();
-            $count = $stmt_check->fetchColumn();
-
-            if ($count == 0) {
-                // Handle file upload
-                if (isset($_FILES['paymentProof']) && $_FILES['paymentProof']['error'] == UPLOAD_ERR_OK) {
-                    $fileTmpPath = $_FILES['paymentProof']['tmp_name'];
-                    $fileName = $_FILES['paymentProof']['name'];
-                    $fileSize = $_FILES['paymentProof']['size'];
-                    $fileType = $_FILES['paymentProof']['type'];
-                    $fileNameCmps = explode(".", $fileName);
-                    $fileExtension = strtolower(end($fileNameCmps));
-
-                    // Specify the target directory
-                    $targetDir = "../assets/dist/img/";
-                    $targetFilePath = $targetDir . $fileName;
-                    $lister=$result['name'];
-
-                    // Allow certain file formats
-                    $allowedExtensions = ['jpg', 'jpeg', 'png'];
-
-                    if (in_array($fileExtension, $allowedExtensions)) {
-                        // Move uploaded file to the target directory
-                        if (move_uploaded_file($fileTmpPath, $targetFilePath)) {
-                            $sql_insert_payment = "INSERT INTO payment (tuition_payment_slip_number, money_type, payment_date, payment_time, payment_status, payment_proof,lister) 
-                                                   VALUES (:tuition_payment_slip_number, 'Bank Transfer', CURDATE(), DATE_FORMAT(NOW(), '%H:%i:%s'), 'approval', :payment_proof, :lister)";
-
-                            $stmt_insert_payment = $condb->prepare($sql_insert_payment);
-                            $stmt_insert_payment->bindParam(':tuition_payment_slip_number', $tuition_payment_slip_number, PDO::PARAM_STR);
-                            $stmt_insert_payment->bindParam(':payment_proof', $fileName, PDO::PARAM_STR);
-                            $stmt_insert_payment->bindParam(':lister', $lister, PDO::PARAM_STR);
-                            $stmt_insert_payment->execute();
-                            echo '<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>';
-                            echo '<script>
-                                    Swal.fire({
-                                        title: "บันทึกการชำระเงินเสร็จสิ้น",
-                                        text: "รอแอดมินอนุมัติการชำระเงิน",
-                                        icon: "success",
-                                        confirmButtonText: "OK"
-                                    }).then((result) => {
-                                        if (result.isConfirmed) {
-                                            window.location.href = "../mainstu/index.php";
-                                        }
-                                    });
-                                  </script>';
-                        } else {
-                            echo '<script>
-                                    Swal.fire({
-                                        title: "เกิดข้อผิดพลาดในการย้ายไฟล์ที่อัปโหลด",
-                                        icon: "error",
-                                        confirmButtonText: "OK"
-                                    }).then((result) => {
-                                        if (result.isConfirmed) {
-                                            window.location.href = "../mainstu/index.php"; // Change to your desired page
-                                        }
-                                    });
-                                </script>';
-                        }
-                    } else {
-                        echo '<script>
-                            Swal.fire({
-                                title: "ประเภทไฟล์ไม่ถูกต้อง",
-                                text: "อนุญาตให้ใช้เฉพาะไฟล์ JPG, JPEG และ PNG",
-                                icon: "error",
-                                confirmButtonText: "OK"
-                            })
-                           </script>';
-                    }
-                } else {
-        
-                }
-            } else {
-               //ให้ปุ่มหายไป
-            }
-        }  else {
-            echo '<script>
-                Swal.fire({
-                    title: "นักศึกษาต้องดาวน์โหลดใบชำระค่าเทอมก่อนจึงสามารถส่งหลักฐานการชำระเงินได้",
-                    icon: "warning",
-                    confirmButtonText: "ไปหน้าใบชำระค่าเทอม"
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        window.location.href = "../payment/cash.php";
-                    }
-                });
-            </script>';
-        }
-    } else {
-        echo "No student found with ID " . htmlspecialchars($student_id);
-    } 
-}
-?>
-
-
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>หลักฐานการชำระค่าเงิน</title>
+    <title>จัดการข้อมูลแผนการเรียน</title>
     <!-- Bootstrap CSS -->
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
     <!-- SweetAlert2 CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.10.24/css/jquery.dataTables.min.css">
     <!-- Custom CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="styles.css" rel="stylesheet">
     <style>
-    /* Card styles */
-    .card-custom {
-        border-color: #007bff;
-        border-radius: 0.5rem;
-        box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-        margin-bottom: 1.5rem;
-    }
+        .content {
+            display: flex;
+            flex-direction: column;
+            align-items: left;
+            /* จัดตรงกลางทั้งแนวนอน */
+        }
 
-    .card-header-custom {
-        background-color: #000000;
-        color: #fff;
-        border-bottom: 1px solid #000000;
-    }
+        h3.text-primary {
+            margin-left: 100px;
+            /* ปรับระยะห่างจากขอบซ้าย */
+            margin-bottom: 10px;
+            /* ปรับระยะห่างระหว่างชื่อสาขาและการ์ด */
+            text-align: left;
+            /* จัดให้อยู่ตรงกลาง */
+        }
 
-    .form-control {
-        border-radius: 0.25rem;
-        box-shadow: none;
-        max-width: 500px;
-    }
+        .card {
+            width: 100%;
+            /* ให้การ์ดมีความกว้างเต็มพื้นที่ container */
+        }
 
-    .form-group label {
-        font-weight: bold;
-    }
+        .container {
+            width: 100%;
+            /* ปรับความกว้างของการ์ด */
+        }
 
-    .form-group .form-control {
-        width: 100%;
-    }
+        .container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-top: 20px;
+        }
 
-    .btn-info {
-        background-color: #17a2b8;
-        border-color: #17a2b8;
-    }
+        .academic-year-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
 
-    .btn-info:hover {
-        background-color: #138496;
-        border-color: #117a8b;
-    }
+        .academic-year {
+            font-size: 30px;
+            padding: 0 30px;
+            margin-top: 20px; 
+        }
 
-    .text-primary {
-        color: #007bff;
-    }
+        .arrow {
+            background-color: transparent;
+            border: none;
+            font-size: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            padding: 10px;
+            color: #000000; 
+        }
 
-    .form-advice ul {
-        list-style-type: disc;
-        padding-left: 1.5rem;
-    }
-
-    .card-body-custom {
-        display: flex;
-        align-items: flex-start;
-    }
-
-    .form-container {
-        flex: 2;
-        margin-right: 1rem;
-    }
-
-    .advice-card {
-        border-color: #007bff;
-        border-radius: 0.5rem;
-        box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-        margin-bottom: 1.5rem;
-        max-width: 500px;
-    }
-
-    .advice-card .card-header {
-        background-color: #6c757d;
-        color: #fff;
-    }
-
-    /* Custom upload button styles */
-    .upload-container {
-        position: relative;
-        width: 100%;
-        max-width: 500px;
-        margin-bottom: 1rem;
-    }
-
-    .upload-button {
-        display: block;
-        width: 100%;
-        padding: 10px;
-        border: 2px dashed #007bff;
-        border-radius: 0.5rem;
-        background-color: #f8f9fa;
-        text-align: center;
-        cursor: pointer;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .upload-button:hover {
-        background-color: #e9ecef;
-    }
-
-    .upload-button input[type="file"] {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        opacity: 0;
-        cursor: pointer;
-    }
-
-    .image-preview-container {
-        position: relative;
-        width: 100%;
-        max-width: 500px;
-        margin-top: 1rem;
-        display: none;
-        /* Hide container initially */
-    }
-
-    .image-preview {
-        width: 100%;
-        height: auto;
-        border: 2px solid #007bff;
-        border-radius: 0.5rem;
-        box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-    }
-
-    .remove-preview {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background: rgba(0, 0, 0, 0.5);
-        color: #fff;
-        border: none;
-        border-radius: 50%;
-        padding: 5px;
-        cursor: pointer;
-        display: none;
-        /* Hide button initially */
-        font-size: 20px;
-    }
+        .arrow:hover {
+            color: #0056b3;
+        }
     </style>
 </head>
 
 <body>
+    <!-- Content Wrapper. Contains page content -->
     <div class="content-wrapper">
         <section class="content-header">
             <div class="container-fluid">
                 <div class="row mb-2">
                     <div class="col-sm-6">
-                        <h1 class="text-primary">ส่งหลักฐานการชำระเงิน</h1>
+                        <h1 class="text-primary">
+                            จัดการข้อมูลแผนการเรียน
+                        </h1>
                     </div>
-                </div>
-            </div>
-        </section>
-
-        <section class="content">
-            <div class="container-fluid">
-                <div class="row">
-                    <div class="col-md-12">
-                        <div class="card card-custom">
-                            <div class="card-header card-header-custom">
-                                <h3 class="card-title">ฟอร์มส่งหลักฐานการชำระเงิน</h3>
-                            </div>
-                            <div class="card-body card-body-custom">
-                                <div class="form-container">
-                                    <form id="paymentForm" method="post" action="" enctype="multipart/form-data">
-                                        <!-- รหัสการลงทะเบียน -->
-                                        <div class="form-group">
-                                            <label for="registrationCode">รหัสการลงทะเบียน</label>
-                                            <input type="text" class="form-control" id="registrationCode"
-                                                name="registrationCode"
-                                                value="<?php echo htmlspecialchars($data['registration_id']); ?>"
-                                                required>
-                                        </div>
-
-                                        <!-- รหัสนักเรียน -->
-                                        <div class="form-group">
-                                            <label for="studentId">รหัสนักเรียน</label>
-                                            <input type="text" class="form-control" id="studentId" name="studentId"
-                                                value="<?php echo htmlspecialchars($data['student_id']); ?>" required>
-                                        </div>
-
-                                        <!-- ชื่อ-สกุลนักเรียน -->
-                                        <div class="form-group">
-                                            <label for="studentName">ชื่อ-สกุลนักเรียน</label>
-                                            <input type="text" class="form-control" id="studentName" name="studentName"
-                                                value="<?php echo htmlspecialchars($data['name']); ?>" required>
-                                        </div>
-
-                                        <!-- หลักฐานการชำระเงิน -->
-                                        <div class="form-group upload-container">
-                                            <label for="paymentProof">อัปโหลดหลักฐานการชำระเงิน</label>
-                                            <div class="upload-button">
-                                                <input type="file" id="paymentProof" name="paymentProof"
-                                                    accept="image/*" required onchange="previewImage(event)">
-                                                <i class="fas fa-upload"></i> คลิกที่นี่เพื่ออัปโหลด <p id="fileName"
-                                                    class="mt-2"></p> <!-- File name display -->
-                                            </div>
-
-                                        </div>
-
-                                        <!-- Image preview -->
-                                        <div id="imagePreviewContainer" class="image-preview-container">
-                                            <img id="imagePreview" class="image-preview" src="#" alt="Preview Image">
-                                            <button type="button" class="remove-preview" onclick="removePreview()">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                        </div>
-
-                                        <br><button type="submit" class="btn btn-info"
-                                            id="savePaymentButton">บันทึกหลักฐานการชำระเงิน</button>
-                                    </form>
-                                </div>
-                                <div class="advice-container">
-                                    <div class="card advice-card">
-                                        <div class="card-header">
-                                            <h4 class="card-title">คำแนะนำในการส่งหลักฐานการชำระเงิน</h4>
-                                        </div>
-                                        <div class="card-body">
-                                            <ul>
-                                                <li>อัปโหลดหลักฐาน: นักศึกษาอัปโหลดภาพหลักฐานการชำระเงินที่มีนามสกุลไฟล์
-                                                    jpg, jpeg, png เท่านั้น</li>
-                                            </ul>
-
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
+                    <div class="col-sm-6">
+                        <div class="header-buttons">
+                            <a href="subject_add.php" class="btn btn-primary">เพิ่มข้อมูลแผนการเรียน</a>
+                            <button class="btn btn-info ml-2" id="export-btn">
+                                <i class="fas fa-file-excel"></i> ดาวน์โหลด Excel
+                            </button>
+                            <!-- File upload -->
+                            <form id="upload-form" action="subject.php" method="POST" enctype="multipart/form-data">
+                                <label class="custom-file-upload ml-2">
+                                    <input type="file" name="upload-file" id="upload-file" accept=".xlsx, .xls">
+                                    <i class="fas fa-file-upload"></i> อัปโหลด Excel
+                                </label>
+                            </form>
                         </div>
                     </div>
                 </div>
             </div>
         </section>
-    </div>
+        <!-- Academic Year Display -->
+        <div class="container">
+            <div class="academic-year-wrapper">
+                <button class="arrow left-arrow" onclick="prevYear()">&#8249;</button>
 
+                <div class="academic-year" id="academic-year">ปีการศึกษา 2567</div> 
+
+                <button class="arrow right-arrow" onclick="nextYear()">&#8250;</button> 
+            </div>
+        </div>
+        <!-- Grade Level Dropdown -->
+        <div class="container dropdown-container">
+            <div class="dropdown text-center">
+                <button class="btn btn-custom dropdown-toggle" type="button" id="gradeDropdown" data-toggle="dropdown"
+                    aria-haspopup="true" aria-expanded="false">
+                    เลือกดูแผนการเรียนแต่ละชั้นปี
+                </button>
+                <div class="dropdown-menu" aria-labelledby="gradeDropdown">
+                    <a class="dropdown-item" href="#" onclick="loadSubjects('ปวช1')">
+                        <i class="fas fa-graduation-cap" style="color: #4CAF50; margin-right: 8px;"></i> ปวช1
+                    </a>
+                    <a class="dropdown-item" href="#" onclick="loadSubjects('ปวช2')">
+                        <i class="fas fa-graduation-cap" style="color: #4CAF50; margin-right: 8px;"></i> ปวช2
+                    </a>
+                    <a class="dropdown-item" href="#" onclick="loadSubjects('ปวช3')">
+                        <i class="fas fa-graduation-cap" style="color: #4CAF50; margin-right: 8px;"></i> ปวช3
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item" href="#" onclick="loadSubjects('ปวส1')">
+                        <i class="fas fa-award" style="color: #FF9800; margin-right: 8px;"></i> ปวส1
+                    </a>
+                    <a class="dropdown-item" href="#" onclick="loadSubjects('ปวส2')">
+                        <i class="fas fa-award" style="color: #FF9800; margin-right: 8px;"></i> ปวส2
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main content -->
+        <section class="content">
+            <h3 class="text-primary">สาขาวิชาเครื่องกล สาขางานยานยนต์</h3>
+            <!-- Table for Academic Period 1 -->
+            <div class="container mt-4">
+                <div class="card border-primary">
+                    <div class="card-body">
+                        <h5>ภาคเรียนที่ 1</h5>
+                        <table id="subject-table-1" class="table table-bordered table-striped table-hover">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th width="25%" class='text-center'>รหัสวิชา</th>
+                                    <th width="25%" class='text-center'>ชื่อวิชา</th>
+                                    <th width="5%" class='text-center'>หน่วยกิต</th>
+                                    <th width="15%" class='text-center'>รหัสสาขา</th>
+                                    <th width="5%" class='text-center'>แก้ไข</th>
+                                    <th width="5%" class='text-center'>ลบ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="subject-tbody-1">
+                                <tr>
+                                    <td>001</td>
+                                    <td>คณิตศาสตร์พื้นฐาน</td>
+                                    <td>3</td>
+                                    <td>101</td>
+                                    <td class='text-center'>
+                                        <a href="#" class="btn btn-warning btn-sm">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </td>
+                                    <td class='text-center'>
+                                        <a href="#" class="btn btn-danger btn-sm delete-button">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>002</td>
+                                    <td>ฟิสิกส์พื้นฐาน</td>
+                                    <td>4</td>
+                                    <td>102</td>
+                                    <td class='text-center'>
+                                        <a href="#" class="btn btn-warning btn-sm">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </td>
+                                    <td class='text-center'>
+                                        <a href="#" class="btn btn-danger btn-sm delete-button">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table for Academic Period 2 -->
+            <div class="container mt-4">
+                <div class="card border-primary">
+                    <div class="card-body">
+                        <h5>ภาคเรียนที่ 2</h5>
+                        <table id="subject-table-2" class="table table-bordered table-striped table-hover">
+                            <thead class="thead-dark">
+                                <tr>
+                                    <th width="25%" class='text-center'>รหัสวิชา</th>
+                                    <th width="25%" class='text-center'>ชื่อวิชา</th>
+                                    <th width="5%" class='text-center'>หน่วยกิต</th>
+                                    <th width="15%" class='text-center'>รหัสสาขา</th>
+                                    <th width="5%" class='text-center'>แก้ไข</th>
+                                    <th width="5%" class='text-center'>ลบ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="subject-tbody-2">
+                                <tr>
+                                    <td>101</td>
+                                    <td>เคมีพื้นฐาน</td>
+                                    <td>3</td>
+                                    <td>103</td>
+                                    <td class='text-center'>
+                                        <a href="#" class="btn btn-warning btn-sm">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </td>
+                                    <td class='text-center'>
+                                        <a href="#" class="btn btn-danger btn-sm delete-button">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>102</td>
+                                    <td>ชีววิทยาพื้นฐาน</td>
+                                    <td>4</td>
+                                    <td>104</td>
+                                    <td class='text-center'>
+                                        <a href="#" class="btn btn-warning btn-sm">
+                                            <i class="fas fa-edit"></i>
+                                        </a>
+                                    </td>
+                                    <td class='text-center'>
+                                        <a href="#" class="btn btn-danger btn-sm delete-button">
+                                            <i class="fas fa-trash-alt"></i>
+                                        </a>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
     <!-- jQuery, Popper.js, and Bootstrap JS -->
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <!-- SweetAlert2 JS -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- SheetJS (xlsx) JS -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
+    <!-- DataTables JS -->
+    <script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
     <script>
-    // Function to preview image
-    function previewImage(event) {
-        const file = event.target.files[0];
-        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
-        const imagePreview = document.getElementById('imagePreview');
-        const removePreviewBtn = document.querySelector('.remove-preview');
-        const fileNameDisplay = document.getElementById('fileName'); // File name display element
+        // Example subjects data
+        const subjects = {
+            "ปวช1": [{
+                    code: "001",
+                    name: "คณิตศาสตร์พื้นฐาน",
+                    credit: "3",
+                    major: "101"
+                },
+                {
+                    code: "002",
+                    name: "ฟิสิกส์พื้นฐาน",
+                    credit: "4",
+                    major: "102"
+                }
+            ],
+            "ปวช2": [{
+                    code: "101",
+                    name: "เคมีพื้นฐาน",
+                    credit: "3",
+                    major: "103"
+                },
+                {
+                    code: "102",
+                    name: "ชีววิทยาพื้นฐาน",
+                    credit: "4",
+                    major: "104"
+                }
+            ],
+            "ปวช3": [{
+                    code: "201",
+                    name: "ภาษาอังกฤษเพื่ออาชีพ",
+                    credit: "2",
+                    major: "105"
+                },
+                {
+                    code: "202",
+                    name: "การจัดการธุรกิจ",
+                    credit: "3",
+                    major: "106"
+                }
+            ],
+            "ปวส1": [{
+                    code: "301",
+                    name: "การเงินและการบัญชี",
+                    credit: "3",
+                    major: "107"
+                },
+                {
+                    code: "302",
+                    name: "การตลาด",
+                    credit: "4",
+                    major: "108"
+                }
+            ],
+            "ปวส2": [{
+                    code: "401",
+                    name: "การจัดการทรัพยากรมนุษย์",
+                    credit: "3",
+                    major: "109"
+                },
+                {
+                    code: "402",
+                    name: "เทคโนโลยีสารสนเทศ",
+                    credit: "4",
+                    major: "110"
+                }
+            ]
+        };
 
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                imagePreview.src = e.target.result;
-                imagePreviewContainer.style.display = 'block';
-                removePreviewBtn.style.display = 'block';
-            };
-            reader.readAsDataURL(file);
+        function loadSubjects(grade) {
+            const tbody1 = document.getElementById('subject-tbody-1');
+            const tbody2 = document.getElementById('subject-tbody-2');
+            tbody1.innerHTML = ""; // Clear existing rows for Period 1
+            tbody2.innerHTML = ""; // Clear existing rows for Period 2
 
-            // Display the file name
-            fileNameDisplay.textContent = file.name;
-        } else {
-            fileNameDisplay.textContent = ''; // Clear file name if no file
+            if (subjects[grade]) {
+                subjects[grade].forEach(subject => {
+                    const row = `<tr>
+                            <td>${subject.code}</td>
+                            <td>${subject.name}</td>
+                            <td>${subject.credit}</td>
+                            <td>${subject.major}</td>
+                            <td class='text-center'>
+                                <a href="#" class="btn btn-warning btn-sm">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                            </td>
+                            <td class='text-center'>
+                                <a href="#" class="btn btn-danger btn-sm delete-button">
+                                    <i class="fas fa-trash-alt"></i>
+                                </a>
+                            </td>
+                        </tr>`;
+                    tbody1.insertAdjacentHTML('beforeend', row); // Add to Period 1 table
+                    tbody2.insertAdjacentHTML('beforeend', row); // Add to Period 2 table
+                });
+
+                // Initialize DataTables after content is loaded
+                $('#subject-table-1').DataTable();
+                $('#subject-table-2').DataTable();
+            } else {
+                tbody1.insertAdjacentHTML('beforeend', '<tr><td colspan="6" class="text-center">ไม่พบข้อมูล</td></tr>');
+                tbody2.insertAdjacentHTML('beforeend', '<tr><td colspan="6" class="text-center">ไม่พบข้อมูล</td></tr>');
+            }
         }
-    }
 
-    function removePreview() {
-        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
-        const imagePreview = document.getElementById('imagePreview');
-        const fileInput = document.getElementById('paymentProof');
-        const removePreviewBtn = document.querySelector('.remove-preview');
+        // Delete confirmation
+        document.addEventListener('click', function(e) {
+            if (e.target && e.target.matches('.delete-button')) {
+                e.preventDefault();
+                Swal.fire({
+                    title: 'คุณแน่ใจหรือไม่?',
+                    text: "คุณจะไม่สามารถย้อนกลับได้!",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#3085d6',
+                    cancelButtonColor: '#d33',
+                    confirmButtonText: 'ใช่, ลบข้อมูล!'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        Swal.fire('ลบข้อมูล!', 'ข้อมูลของคุณถูกลบแล้ว', 'success');
+                    }
+                });
+            }
+        });
 
-        fileInput.value = '';
-        imagePreview.src = '#';
-        imagePreviewContainer.style.display = 'none';
-        removePreviewBtn.style.display = 'none';
-    }
+        // Excel export functionality
+        document.getElementById('export-btn').addEventListener('click', function() {
+            const wb = XLSX.utils.book_new();
+            const ws1 = XLSX.utils.table_to_sheet(document.getElementById('subject-table-1'));
+            const ws2 = XLSX.utils.table_to_sheet(document.getElementById('subject-table-2'));
+            XLSX.utils.book_append_sheet(wb, ws1, 'ภาคเรียนที่ 1');
+            XLSX.utils.book_append_sheet(wb, ws2, 'ภาคเรียนที่ 2');
+            XLSX.writeFile(wb, 'subjects.xlsx');
+        });
+
+        // File upload functionality
+        document.getElementById('upload-file').addEventListener('change', function() {
+            var formData = new FormData();
+            var fileInput = document.getElementById('upload-file');
+            var file = fileInput.files[0];
+
+            formData.append('upload-file', file);
+
+            fetch('upload_subjects.php', {
+                    method: 'POST',
+                    body: formData,
+                })
+                .then(response => response.json())
+                .catch(error => {
+                    console.error('Fetch error:', error);
+                    return {};
+                })
+                .finally(() => {
+                    Swal.fire({
+                        title: 'สำเร็จ!',
+                        text: 'ข้อมูลได้ถูกอัปโหลดเรียบร้อยแล้ว',
+                        icon: 'success',
+                        confirmButtonText: 'ตกลง'
+                    }).then(() => {
+                        window.location.href = 'subject.php';
+                    });
+                });
+        });
+
+        // กำหนดปีการศึกษาเริ่มต้น
+        let years = [2565, 2566, 2567, 2568, 2569];
+        let currentIndex = 2; // ปีการศึกษา 2567 (index 2)
+
+        function updateYear() {
+            document.getElementById('academic-year').textContent = 'ปีการศึกษา ' + years[currentIndex];
+        }
+
+        function prevYear() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                updateYear();
+            }
+        }
+
+        function nextYear() {
+            if (currentIndex < years.length - 1) {
+                currentIndex++;
+                updateYear();
+            }
+        }
     </script>
 </body>
 
