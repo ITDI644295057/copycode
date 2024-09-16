@@ -5,89 +5,89 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>จัดการข้อมูลแผนการเรียน</title>
-    <!-- Bootstrap CSS -->
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
-    <!-- SweetAlert2 CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-    <!-- DataTables CSS -->
     <link rel="stylesheet" href="https://cdn.datatables.net/1.10.24/css/jquery.dataTables.min.css">
-    <!-- Custom CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="styles.css" rel="stylesheet">
     <style>
-        .content {
-            display: flex;
-            flex-direction: column;
-            align-items: left;
-            /* จัดตรงกลางทั้งแนวนอน */
-        }
+    .content {
+        display: flex;
+        flex-direction: column;
+        align-items: left;
+    }
 
-        h3.text-primary {
-            margin-left: 100px;
-            /* ปรับระยะห่างจากขอบซ้าย */
-            margin-bottom: 10px;
-            /* ปรับระยะห่างระหว่างชื่อสาขาและการ์ด */
-            text-align: left;
-            /* จัดให้อยู่ตรงกลาง */
-        }
+    h3.text-primary {
+        text-align: center;
+        margin-top: 50px;
+    }
 
-        .card {
-            width: 100%;
-            /* ให้การ์ดมีความกว้างเต็มพื้นที่ container */
-        }
+    .card {
+        width: 100%;
+    }
 
-        .container {
-            width: 100%;
-            /* ปรับความกว้างของการ์ด */
-        }
+    .container {
+        width: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-top: 20px;
+    }
 
-        .container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin-top: 20px;
-        }
+    .dropdown-container {
+        display: flex;
+        gap: 20px;
 
-        .academic-year-wrapper {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
+        /* Ensure full width to enable centering */
+    }
 
-        .academic-year {
-            font-size: 30px;
-            padding: 0 30px;
-            margin-top: 20px; 
-        }
+    .dropdown-custom {
+        font-size: 18px;
+    }
 
-        .arrow {
-            background-color: transparent;
-            border: none;
-            font-size: 40px;
-            font-weight: bold;
-            cursor: pointer;
-            padding: 10px;
-            color: #000000; 
-        }
+    .academic-year-wrapper {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
 
-        .arrow:hover {
-            color: #0056b3;
-        }
+    .arrow {
+        background-color: transparent;
+        border: none;
+        font-size: 40px;
+        font-weight: bold;
+        cursor: pointer;
+        padding: 10px;
+        color: #000000;
+    }
+
+    .arrow:hover {
+        color: #0056b3;
+    }
+
+    .button-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 20px;
+        /* Adds space between buttons */
+        margin: 20px 0;
+    }
+    .btn-clear {
+        background-color: #dc3545; 
+        color: #fff;
+        font-size: 18px;
+    }
     </style>
 </head>
 
 <body>
-    <!-- Content Wrapper. Contains page content -->
     <div class="content-wrapper">
         <section class="content-header">
             <div class="container-fluid">
                 <div class="row mb-2">
                     <div class="col-sm-6">
-                        <h1 class="text-primary">
-                            จัดการข้อมูลแผนการเรียน
-                        </h1>
+                        <h1 class="text-primary">จัดการข้อมูลแผนการเรียน</h1>
                     </div>
                     <div class="col-sm-6">
                         <div class="header-buttons">
@@ -95,7 +95,6 @@
                             <button class="btn btn-info ml-2" id="export-btn">
                                 <i class="fas fa-file-excel"></i> ดาวน์โหลด Excel
                             </button>
-                            <!-- File upload -->
                             <form id="upload-form" action="subject.php" method="POST" enctype="multipart/form-data">
                                 <label class="custom-file-upload ml-2">
                                     <input type="file" name="upload-file" id="upload-file" accept=".xlsx, .xls">
@@ -107,356 +106,224 @@
                 </div>
             </div>
         </section>
-        <!-- Academic Year Display -->
-        <div class="container">
-            <div class="academic-year-wrapper">
-                <button class="arrow left-arrow" onclick="prevYear()">&#8249;</button>
 
-                <div class="academic-year" id="academic-year">ปีการศึกษา 2567</div> 
-
-                <button class="arrow right-arrow" onclick="nextYear()">&#8250;</button> 
-            </div>
-        </div>
-        <!-- Grade Level Dropdown -->
         <div class="container dropdown-container">
-            <div class="dropdown text-center">
-                <button class="btn btn-custom dropdown-toggle" type="button" id="gradeDropdown" data-toggle="dropdown"
+            <div class="dropdown">
+                <button class="btn btn-custom dropdown-toggle" type="button" id="yearDropdown" data-toggle="dropdown"
                     aria-haspopup="true" aria-expanded="false">
-                    เลือกดูแผนการเรียนแต่ละชั้นปี
+                    เลือกปีการศึกษา
                 </button>
-                <div class="dropdown-menu" aria-labelledby="gradeDropdown">
-                    <a class="dropdown-item" href="#" onclick="loadSubjects('ปวช1')">
-                        <i class="fas fa-graduation-cap" style="color: #4CAF50; margin-right: 8px;"></i> ปวช1
-                    </a>
-                    <a class="dropdown-item" href="#" onclick="loadSubjects('ปวช2')">
-                        <i class="fas fa-graduation-cap" style="color: #4CAF50; margin-right: 8px;"></i> ปวช2
-                    </a>
-                    <a class="dropdown-item" href="#" onclick="loadSubjects('ปวช3')">
-                        <i class="fas fa-graduation-cap" style="color: #4CAF50; margin-right: 8px;"></i> ปวช3
-                    </a>
+                <div class="dropdown-menu" aria-labelledby="yearDropdown">
+                    <a class="dropdown-item" href="#" onclick="selectYear(2567)">2567</a>
+                    <a class="dropdown-item" href="#" onclick="selectYear(2568)">2568</a>
+                    <a class="dropdown-item" href="#" onclick="selectYear(2569)">2569</a>
+                    <a class="dropdown-item" href="#" onclick="selectYear(2570)">2570</a>
+                    <a class="dropdown-item" href="#" onclick="selectYear(2571)">2571</a>
+                </div>
+            </div>
+
+            <div class="dropdown">
+                <button class="btn btn-custom dropdown-toggle" type="button" id="classDropdown" data-toggle="dropdown"
+                    aria-haspopup="true" aria-expanded="false">
+                    เลือกระดับชั้น
+                </button>
+                <div class="dropdown-menu" aria-labelledby="classDropdown">
+                    <a class="dropdown-item" href="#" onclick="selectClass('ปวช.1')">ปวช1</a>
+                    <a class="dropdown-item" href="#" onclick="selectClass('ปวช.2')">ปวช2</a>
+                    <a class="dropdown-item" href="#" onclick="selectClass('ปวช.3')">ปวช3</a>
                     <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="#" onclick="loadSubjects('ปวส1')">
-                        <i class="fas fa-award" style="color: #FF9800; margin-right: 8px;"></i> ปวส1
-                    </a>
-                    <a class="dropdown-item" href="#" onclick="loadSubjects('ปวส2')">
-                        <i class="fas fa-award" style="color: #FF9800; margin-right: 8px;"></i> ปวส2
-                    </a>
+                    <a class="dropdown-item" href="#" onclick="selectClass('ปวส.1')">ปวส1</a>
+                    <a class="dropdown-item" href="#" onclick="selectClass('ปวส.2')">ปวส2</a>
                 </div>
             </div>
         </div>
 
-        <!-- Main content -->
-        <section class="content">
-            <h3 class="text-primary">สาขาวิชาเครื่องกล สาขางานยานยนต์</h3>
-            <!-- Table for Academic Period 1 -->
-            <div class="container mt-4">
-                <div class="card border-primary">
-                    <div class="card-body">
-                        <h5>ภาคเรียนที่ 1</h5>
-                        <table id="subject-table-1" class="table table-bordered table-striped table-hover">
-                            <thead class="thead-dark">
-                                <tr>
-                                    <th width="25%" class='text-center'>รหัสวิชา</th>
-                                    <th width="25%" class='text-center'>ชื่อวิชา</th>
-                                    <th width="5%" class='text-center'>หน่วยกิต</th>
-                                    <th width="15%" class='text-center'>รหัสสาขา</th>
-                                    <th width="5%" class='text-center'>แก้ไข</th>
-                                    <th width="5%" class='text-center'>ลบ</th>
-                                </tr>
-                            </thead>
-                            <tbody id="subject-tbody-1">
-                                <tr>
-                                    <td>001</td>
-                                    <td>คณิตศาสตร์พื้นฐาน</td>
-                                    <td>3</td>
-                                    <td>101</td>
-                                    <td class='text-center'>
-                                        <a href="#" class="btn btn-warning btn-sm">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                    </td>
-                                    <td class='text-center'>
-                                        <a href="#" class="btn btn-danger btn-sm delete-button">
-                                            <i class="fas fa-trash-alt"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>002</td>
-                                    <td>ฟิสิกส์พื้นฐาน</td>
-                                    <td>4</td>
-                                    <td>102</td>
-                                    <td class='text-center'>
-                                        <a href="#" class="btn btn-warning btn-sm">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                    </td>
-                                    <td class='text-center'>
-                                        <a href="#" class="btn btn-danger btn-sm delete-button">
-                                            <i class="fas fa-trash-alt"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+        <div class="button-container">
+            <button class="btn btn-success" id="fetch-btn"><i class="fas fa-search"></i> ดูข้อมูลแผนการเรียน</button>
+            <button class="btn btn-clear" id="clear-btn"><i class="fas fa-times"></i> clear</button>
+        </div>
 
-            <!-- Table for Academic Period 2 -->
-            <div class="container mt-4">
-                <div class="card border-primary">
-                    <div class="card-body">
-                        <h5>ภาคเรียนที่ 2</h5>
-                        <table id="subject-table-2" class="table table-bordered table-striped table-hover">
-                            <thead class="thead-dark">
-                                <tr>
-                                    <th width="25%" class='text-center'>รหัสวิชา</th>
-                                    <th width="25%" class='text-center'>ชื่อวิชา</th>
-                                    <th width="5%" class='text-center'>หน่วยกิต</th>
-                                    <th width="15%" class='text-center'>รหัสสาขา</th>
-                                    <th width="5%" class='text-center'>แก้ไข</th>
-                                    <th width="5%" class='text-center'>ลบ</th>
-                                </tr>
-                            </thead>
-                            <tbody id="subject-tbody-2">
-                                <tr>
-                                    <td>101</td>
-                                    <td>เคมีพื้นฐาน</td>
-                                    <td>3</td>
-                                    <td>103</td>
-                                    <td class='text-center'>
-                                        <a href="#" class="btn btn-warning btn-sm">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                    </td>
-                                    <td class='text-center'>
-                                        <a href="#" class="btn btn-danger btn-sm delete-button">
-                                            <i class="fas fa-trash-alt"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                                <tr>
-                                    <td>102</td>
-                                    <td>ชีววิทยาพื้นฐาน</td>
-                                    <td>4</td>
-                                    <td>104</td>
-                                    <td class='text-center'>
-                                        <a href="#" class="btn btn-warning btn-sm">
-                                            <i class="fas fa-edit"></i>
-                                        </a>
-                                    </td>
-                                    <td class='text-center'>
-                                        <a href="#" class="btn btn-danger btn-sm delete-button">
-                                            <i class="fas fa-trash-alt"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
+        <section class="content">
+            <div id="subject-container"></div>
         </section>
     </div>
-    <!-- jQuery, Popper.js, and Bootstrap JS -->
+
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-    <!-- SweetAlert2 JS -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <!-- SheetJS (xlsx) JS -->
     <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
-    <!-- DataTables JS -->
     <script src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
     <script>
-        // Example subjects data
-        const subjects = {
-            "ปวช1": [{
-                    code: "001",
-                    name: "คณิตศาสตร์พื้นฐาน",
-                    credit: "3",
-                    major: "101"
-                },
-                {
-                    code: "002",
-                    name: "ฟิสิกส์พื้นฐาน",
-                    credit: "4",
-                    major: "102"
-                }
-            ],
-            "ปวช2": [{
-                    code: "101",
-                    name: "เคมีพื้นฐาน",
-                    credit: "3",
-                    major: "103"
-                },
-                {
-                    code: "102",
-                    name: "ชีววิทยาพื้นฐาน",
-                    credit: "4",
-                    major: "104"
-                }
-            ],
-            "ปวช3": [{
-                    code: "201",
-                    name: "ภาษาอังกฤษเพื่ออาชีพ",
-                    credit: "2",
-                    major: "105"
-                },
-                {
-                    code: "202",
-                    name: "การจัดการธุรกิจ",
-                    credit: "3",
-                    major: "106"
-                }
-            ],
-            "ปวส1": [{
-                    code: "301",
-                    name: "การเงินและการบัญชี",
-                    credit: "3",
-                    major: "107"
-                },
-                {
-                    code: "302",
-                    name: "การตลาด",
-                    credit: "4",
-                    major: "108"
-                }
-            ],
-            "ปวส2": [{
-                    code: "401",
-                    name: "การจัดการทรัพยากรมนุษย์",
-                    credit: "3",
-                    major: "109"
-                },
-                {
-                    code: "402",
-                    name: "เทคโนโลยีสารสนเทศ",
-                    credit: "4",
-                    major: "110"
-                }
-            ]
-        };
+    let selectedYear = null;
+    let selectedClass = null;
 
-        function loadSubjects(grade) {
-            const tbody1 = document.getElementById('subject-tbody-1');
-            const tbody2 = document.getElementById('subject-tbody-2');
-            tbody1.innerHTML = ""; // Clear existing rows for Period 1
-            tbody2.innerHTML = ""; // Clear existing rows for Period 2
+    function selectYear(year) {
+        selectedYear = year;
+        $('#yearDropdown').text(`ปีการศึกษา ${year}`);
+    }
 
-            if (subjects[grade]) {
-                subjects[grade].forEach(subject => {
-                    const row = `<tr>
-                            <td>${subject.code}</td>
-                            <td>${subject.name}</td>
-                            <td>${subject.credit}</td>
-                            <td>${subject.major}</td>
-                            <td class='text-center'>
-                                <a href="#" class="btn btn-warning btn-sm">
-                                    <i class="fas fa-edit"></i>
-                                </a>
-                            </td>
-                            <td class='text-center'>
-                                <a href="#" class="btn btn-danger btn-sm delete-button">
-                                    <i class="fas fa-trash-alt"></i>
-                                </a>
-                            </td>
-                        </tr>`;
-                    tbody1.insertAdjacentHTML('beforeend', row); // Add to Period 1 table
-                    tbody2.insertAdjacentHTML('beforeend', row); // Add to Period 2 table
-                });
+    function selectClass(classYear) {
+        selectedClass = classYear;
+        $('#classDropdown').text(`ระดับชั้น ${classYear}`);
+    }
 
-                // Initialize DataTables after content is loaded
-                $('#subject-table-1').DataTable();
-                $('#subject-table-2').DataTable();
-            } else {
-                tbody1.insertAdjacentHTML('beforeend', '<tr><td colspan="6" class="text-center">ไม่พบข้อมูล</td></tr>');
-                tbody2.insertAdjacentHTML('beforeend', '<tr><td colspan="6" class="text-center">ไม่พบข้อมูล</td></tr>');
-            }
-        }
-
-        // Delete confirmation
-        document.addEventListener('click', function(e) {
-            if (e.target && e.target.matches('.delete-button')) {
-                e.preventDefault();
-                Swal.fire({
-                    title: 'คุณแน่ใจหรือไม่?',
-                    text: "คุณจะไม่สามารถย้อนกลับได้!",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#3085d6',
-                    cancelButtonColor: '#d33',
-                    confirmButtonText: 'ใช่, ลบข้อมูล!'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        Swal.fire('ลบข้อมูล!', 'ข้อมูลของคุณถูกลบแล้ว', 'success');
+    function updateSubjectContainer() {
+        if (selectedYear && selectedClass) {
+            $.ajax({
+                url: '../fetch/get_studyplan.php',
+                method: 'GET',
+                data: {
+                    class_year: selectedClass,
+                    school_year: selectedYear
+                },
+                dataType: 'json',
+                success: function(response) {
+                    if (response.status === 'no_data') {
+                        $('#subject-container').html(
+                            `<p style="font-size: 30px; font-weight: bold; color: #dc3545; text-align: center; margin-top: 40px;">
+                                ไม่พบแผนการเรียน ระดับชั้น ${response.class_year} ปีการศึกษา ${response.school_year}
+                            </p>`
+                        );
+                    } else if (response.status === 'success') {
+                        $('#subject-container').html(renderSubjectData(response.data));
+                        // Initialize DataTables after loading new content
+                        $('#subject-table-1').DataTable({
+                            paging: false,
+                            info: false,
+                            searching: false
+                        });
+                        $('#subject-table-2').DataTable({
+                            paging: false,
+                            info: false,
+                            searching: false
+                        });
                     }
-                });
-            }
-        });
-
-        // Excel export functionality
-        document.getElementById('export-btn').addEventListener('click', function() {
-            const wb = XLSX.utils.book_new();
-            const ws1 = XLSX.utils.table_to_sheet(document.getElementById('subject-table-1'));
-            const ws2 = XLSX.utils.table_to_sheet(document.getElementById('subject-table-2'));
-            XLSX.utils.book_append_sheet(wb, ws1, 'ภาคเรียนที่ 1');
-            XLSX.utils.book_append_sheet(wb, ws2, 'ภาคเรียนที่ 2');
-            XLSX.writeFile(wb, 'subjects.xlsx');
-        });
-
-        // File upload functionality
-        document.getElementById('upload-file').addEventListener('change', function() {
-            var formData = new FormData();
-            var fileInput = document.getElementById('upload-file');
-            var file = fileInput.files[0];
-
-            formData.append('upload-file', file);
-
-            fetch('upload_subjects.php', {
-                    method: 'POST',
-                    body: formData,
-                })
-                .then(response => response.json())
-                .catch(error => {
-                    console.error('Fetch error:', error);
-                    return {};
-                })
-                .finally(() => {
-                    Swal.fire({
-                        title: 'สำเร็จ!',
-                        text: 'ข้อมูลได้ถูกอัปโหลดเรียบร้อยแล้ว',
-                        icon: 'success',
-                        confirmButtonText: 'ตกลง'
-                    }).then(() => {
-                        window.location.href = 'subject.php';
-                    });
-                });
-        });
-
-        // กำหนดปีการศึกษาเริ่มต้น
-        let years = [2565, 2566, 2567, 2568, 2569];
-        let currentIndex = 2; // ปีการศึกษา 2567 (index 2)
-
-        function updateYear() {
-            document.getElementById('academic-year').textContent = 'ปีการศึกษา ' + years[currentIndex];
+                }
+            });
+        } else if (!selectedYear && !selectedClass) {
+            Swal.fire('กรุณาเลือกปีการศึกษาและระดับชั้นก่อนนะครับ');
+        } else if (!selectedYear) {
+            Swal.fire('กรุณาเลือกปีการศึกษา');
+        } else if (!selectedClass) {
+            Swal.fire('กรุณาเลือกระดับชั้น');
         }
+    }
 
-        function prevYear() {
-            if (currentIndex > 0) {
-                currentIndex--;
-                updateYear();
+    function renderSubjectData(data) {
+        let html = '';
+        for (const major_name in data) {
+            for (const field_of_work_name in data[major_name]) {
+                html += `<h3 class='text-primary'>${major_name} ${field_of_work_name}</h3>`;
+                for (let semester = 1; semester <= 2; semester++) {
+                    html += `<div class='container mt-4'>
+                            <div class='card border-primary'>
+                                <div class='card-body'>
+                                    <h5>ภาคเรียนที่ ${semester}</h5>
+                                    <table id='subject-table-${semester}' class='table table-bordered table-striped table-hover'>
+                                        <thead class='thead-dark'>
+                                            <tr>
+                                                <th width='15%' class='text-center'>รหัสวิชา</th>
+                                                <th width='25%' class='text-center'>ชื่อวิชา</th>
+                                                <th width='15%' class='text-center'>หน่วยกิต</th>
+                                                <th width='15%' class='text-center'>รหัสสาขา</th>
+                                                <th width='5%' class='text-center'>แก้ไข</th>
+                                                <th width='5%' class='text-center'>ลบ</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>`;
+                    if (data[major_name][field_of_work_name][semester]) {
+                        for (const subject of data[major_name][field_of_work_name][semester]) {
+                            html += `<tr>
+                                    <td class='text-center'>${subject.subject_id}</td>
+                                    <td>${subject.subject_name}</td>
+                                    <td class='text-center'>${subject.num_credits}</td>
+                                    <td class='text-center'>${subject.major_id}</td>
+                                    <td class='text-center'>
+                                        <a href='#' class='btn btn-warning btn-sm'>
+                                            <i class='fas fa-edit'></i>
+                                        </a>
+                                    </td>
+                                    <td class='text-center'>
+                                        <a href='#' class='btn btn-danger btn-sm delete-button'>
+                                            <i class='fas fa-trash-alt'></i>
+                                        </a>
+                                    </td>
+                                </tr>`;
+                        }
+                    } else {
+                        html += "<tr><td colspan='6' class='text-center'>ไม่พบข้อมูล</td></tr>";
+                    }
+                    html += `</tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>`;
+                }
             }
         }
+        return html;
+    }
 
-        function nextYear() {
-            if (currentIndex < years.length - 1) {
-                currentIndex++;
-                updateYear();
-            }
-        }
+    // Add event listener to the fetch button
+    $('#fetch-btn').on('click', function() {
+        updateSubjectContainer();
+    });
+
+    // Add event listener to the clear button
+    $('#clear-btn').on('click', function() {
+        selectedYear = null;
+        selectedClass = null;
+        $('#yearDropdown').text('เลือกปีการศึกษา');
+        $('#classDropdown').text('เลือกระดับชั้น');
+        $('#subject-container').empty();
+    });
     </script>
 </body>
 
 </html>
+
+
+//get_studyplan.php
+<?php
+include('../config/connect.php');
+
+$class_year = $_GET['class_year'] ?? '';
+$school_year = $_GET['school_year'] ?? '';
+
+$stmt = $condb->prepare("
+    SELECT 
+        major.major_name AS major_name,
+        major.field_of_work_name AS field_of_work_name,
+        study_plan.semester AS semester,
+        subject.subject_id AS subject_id,
+        subject.subject_name AS subject_name,
+        CONCAT(subject.num_credits , '(', subject.total_class_hours, '-', subject.theory_hours, '-', subject.hours_of_practice, ')') AS num_credits,
+        subject.major_id AS major_id
+    FROM 
+        study_plan
+    JOIN 
+        major ON study_plan.major_id = major.major_id
+    JOIN 
+        subject ON study_plan.subject_id = subject.subject_id
+    WHERE 
+        study_plan.class_year = :class_year
+        AND study_plan.school_year = :school_year
+");
+
+$stmt->execute(['class_year' => $class_year, 'school_year' => $school_year]);
+
+$results = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+if (empty($results)) {
+    echo json_encode(['status' => 'no_data', 'class_year' => $class_year, 'school_year' => $school_year]);
+} else {
+    $data = [];
+    foreach ($results as $row) {
+        $data[$row['major_name']][$row['field_of_work_name']][$row['semester']][] = $row;
+    }
+    // Output the data in a format suitable for the front-end
+    // You can use json_encode($data) or any other format you prefer
+    echo json_encode(['status' => 'success', 'data' => $data]);
+}
+?>
