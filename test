@@ -1,476 +1,189 @@
-<?php
-require_once '../config/connect.php';
-
-$data = [
-    'registration_id' => '',
-    'student_id' => '',
-    'name' => ''
-];
-
-$student_id = isset($_SESSION['student']) ? $_SESSION['student'] : null;
-
-if ($student_id) {
-    $sql = "SELECT r.registration_id, s.student_id, s.name 
-            FROM registration r
-            JOIN student s ON r.student_id = s.student_id
-            WHERE s.student_id = :student_id";
-    $stmt = $condb->prepare($sql);
-    $stmt->bindParam(':student_id', $student_id, PDO::PARAM_INT);
-    $stmt->execute();
-    $result = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    if ($result) {
-        $data = [
-            'registration_id' => $result['registration_id'],
-            'student_id' => $result['student_id'],
-            'name' => $result['name']
-        ];
-
-        $registration_id = $result['registration_id'];
-        $sql_payment_slip = "SELECT tuition_payment_slip_number 
-                             FROM tuition_payment_slip 
-                             WHERE registration_id = :registration_id";
-        $stmt_payment_slip = $condb->prepare($sql_payment_slip);
-        $stmt_payment_slip->bindParam(':registration_id', $registration_id, PDO::PARAM_INT);
-        $stmt_payment_slip->execute();
-        $payment_slip_result = $stmt_payment_slip->fetch(PDO::FETCH_ASSOC);
-
-        if ($payment_slip_result) {
-            $tuition_payment_slip_number = $payment_slip_result['tuition_payment_slip_number'];
-
-            $sql_check = "SELECT COUNT(*) FROM payment WHERE tuition_payment_slip_number = :tuition_payment_slip_number";
-            $stmt_check = $condb->prepare($sql_check);
-            $stmt_check->bindParam(':tuition_payment_slip_number', $tuition_payment_slip_number, PDO::PARAM_STR);
-            $stmt_check->execute();
-            $count = $stmt_check->fetchColumn();
-
-            if ($count == 0) {
-                // Handle file upload
-                if (isset($_FILES['paymentProof']) && $_FILES['paymentProof']['error'] == UPLOAD_ERR_OK) {
-                    $fileTmpPath = $_FILES['paymentProof']['tmp_name'];
-                    $fileName = $_FILES['paymentProof']['name'];
-                    $fileSize = $_FILES['paymentProof']['size'];
-                    $fileType = $_FILES['paymentProof']['type'];
-                    $fileNameCmps = explode(".", $fileName);
-                    $fileExtension = strtolower(end($fileNameCmps));
-
-                    // Specify the target directory
-                    $targetDir = "../assets/dist/img/";
-                    $targetFilePath = $targetDir . $fileName;
-                    $lister=$result['name'];
-
-                    // Allow certain file formats
-                    $allowedExtensions = ['jpg', 'jpeg', 'png'];
-
-                    if (in_array($fileExtension, $allowedExtensions)) {
-                        // Move uploaded file to the target directory
-                        if (move_uploaded_file($fileTmpPath, $targetFilePath)) {
-                            $sql_insert_payment = "INSERT INTO payment (tuition_payment_slip_number, money_type, payment_date, payment_time, payment_status, payment_proof,lister) 
-                                                   VALUES (:tuition_payment_slip_number, 'Bank Transfer', CURDATE(), DATE_FORMAT(NOW(), '%H:%i:%s'), 'approval', :payment_proof, :lister)";
-
-                            $stmt_insert_payment = $condb->prepare($sql_insert_payment);
-                            $stmt_insert_payment->bindParam(':tuition_payment_slip_number', $tuition_payment_slip_number, PDO::PARAM_STR);
-                            $stmt_insert_payment->bindParam(':payment_proof', $fileName, PDO::PARAM_STR);
-                            $stmt_insert_payment->bindParam(':lister', $lister, PDO::PARAM_STR);
-                            $stmt_insert_payment->execute();
-                            echo '<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>';
-                            echo '<script>
-                                    Swal.fire({
-                                        title: "บันทึกการชำระเงินเสร็จสิ้น",
-                                        text: "รอแอดมินอนุมัติการชำระเงิน",
-                                        icon: "success",
-                                        confirmButtonText: "OK"
-                                    }).then((result) => {
-                                        if (result.isConfirmed) {
-                                            window.location.href = "../mainstu/index.php";
-                                        }
-                                    });
-                                  </script>';
-                        } else {
-                            echo '<script>
-                                    Swal.fire({
-                                        title: "เกิดข้อผิดพลาดในการย้ายไฟล์ที่อัปโหลด",
-                                        icon: "error",
-                                        confirmButtonText: "OK"
-                                    }).then((result) => {
-                                        if (result.isConfirmed) {
-                                            window.location.href = "../mainstu/index.php"; // Change to your desired page
-                                        }
-                                    });
-                                </script>';
-                        }
-                    } else {
-                        echo '<script>
-                            Swal.fire({
-                                title: "ประเภทไฟล์ไม่ถูกต้อง",
-                                text: "อนุญาตให้ใช้เฉพาะไฟล์ JPG, JPEG และ PNG",
-                                icon: "error",
-                                confirmButtonText: "OK"
-                            })
-                           </script>';
-                    }
-                } else {
-        
-                }
-            } else {
-               //ให้ปุ่มหายไป
-            }
-        }  else {
-            echo '<script>
-                Swal.fire({
-                    title: "นักศึกษาต้องดาวน์โหลดใบชำระค่าเทอมก่อนจึงสามารถส่งหลักฐานการชำระเงินได้",
-                    icon: "warning",
-                    confirmButtonText: "ไปหน้าใบชำระค่าเทอม"
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        window.location.href = "../payment/cash.php";
-                    }
-                });
-            </script>';
-        }
-    } else {
-            echo '<script>
-            Swal.fire({
-                title: "นักศึกษาต้องลงทะเบียนและดาวน์โหลดใบชำระค่าเทอมก่อนจึงสามารถส่งหลักฐานการชำระเงินได้",
-                icon: "warning",
-                confirmButtonText: "ไปหน้าลงทะเบียน"
-            }).then((result) => {
-                if (result.isConfirmed) {
-                    window.location.href = "../register/register.php";
-                }
-            });
-        </script>';
-    } 
-}
-?>
-
-
 <!DOCTYPE html>
-<html lang="en">
+<html lang="th">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>หลักฐานการชำระค่าเงิน</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome CSS -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
-    <!-- SweetAlert2 CSS -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
-    <!-- Custom CSS -->
+    <title>เงื่อนไขในการลงทะเบียน</title>
     <style>
-    /* Card styles */
-    .card-custom {
-        border-color: #007bff;
-        border-radius: 0.5rem;
-        box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-        margin-bottom: 1.5rem;
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f4f4f4;
+        margin: 0;
     }
 
-    .card-header-custom {
-        background-color: #000000;
-        color: #fff;
-        border-bottom: 1px solid #000000;
+    .card {
+        background-color: white;
+        padding: 30px;
+        margin: 14px auto;
+        border-radius: 10px;
+        margin-left: 500px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        max-width: 700px;
     }
 
-    .form-control {
-        border-radius: 0.25rem;
-        box-shadow: none;
-        max-width: 500px;
+    .card h3 {
+        text-align: center;
+        color: #333;
+        margin-bottom: 20px;
     }
 
-    .form-group label {
+    .card p {
+        font-size: 16px;
+        line-height: 1.8;
+        color: #555;
+        margin-bottom: 10px;
+        text-align: left;
+    }
+
+    .input-row {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        margin: 20px 0;
+    }
+
+    .input-group {
+        display: flex;
+        align-items: center;
+        margin-left: 20px;
+    }
+
+    .input-group label {
+        font-size: 16px;
+        color: #333;
+        margin-right: 10px;
+    }
+
+    .input-group select {
+        padding: 8px 12px;
+        font-size: 16px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        width: 160px;
+        transition: border-color 0.3s;
+    }
+
+    .input-group select:focus {
+        border-color: red;
+        outline: none;
+    }
+
+    .buttons {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+    }
+
+    .btn {
+        padding: 10px 20px;
+        font-size: 16px;
+        border-radius: 5px;
+        text-decoration: none;
+        text-align: center;
+        cursor: pointer;
+        margin: 0 20px;
+    }
+
+    .btn-register {
+        background-color: #007bff;
+        color: white;
         font-weight: bold;
     }
 
-    .form-group .form-control {
-        width: 100%;
+    .btn-cancel {
+        background-color: #dc3545;
+        color: white;
+        font-weight: bold;
     }
 
-    .btn-info {
-        background-color: #17a2b8;
-        border-color: #17a2b8;
+    .btn-register.active {
+        pointer-events: auto;
+        opacity: 1;
     }
 
-    .btn-info:hover {
-        background-color: #138496;
-        border-color: #117a8b;
-    }
-
-    .text-primary {
-        color: #007bff;
-    }
-
-    .form-advice ul {
-        list-style-type: disc;
-        padding-left: 1.5rem;
-    }
-
-    .card-body-custom {
-        display: flex;
-        align-items: flex-start;
-    }
-
-    .form-container {
-        flex: 2;
-        margin-right: 1rem;
-    }
-
-    .advice-card {
-        border-color: #007bff;
-        border-radius: 0.5rem;
-        box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-        margin-bottom: 0;
-
-
-    }
-
-    .advice-container {
-        margin-top: 5px;
-        /* Add a top margin to create space between the form and the advice card */
-    }
-
-    .advice-card .card-header {
-        background-color: #6c757d;
-        color: #fff;
-    }
-
-    /* Custom upload button styles */
-    .upload-container {
-        position: relative;
-        width: 100%;
-        max-width: 500px;
-        margin-bottom: 1rem;
-    }
-
-    .upload-button {
-        display: block;
-        width: 100%;
-        padding: 10px;
-        border: 2px dashed #007bff;
-        border-radius: 0.5rem;
-        background-color: #f8f9fa;
-        text-align: center;
-        cursor: pointer;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .upload-button:hover {
-        background-color: #e9ecef;
-    }
-
-    .upload-button input[type="file"] {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        opacity: 0;
-        cursor: pointer;
-    }
-
-    .image-preview-container {
-        position: relative;
-        width: 100%;
-        max-width: 500px;
-        margin-top: 1rem;
-        display: none;
-        /* Hide container initially */
-    }
-
-    .image-preview {
-        width: 100%;
-        height: auto;
-        border: 2px solid #007bff;
-        border-radius: 0.5rem;
-        box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-    }
-
-    .remove-preview {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background: rgba(0, 0, 0, 0.5);
-        color: #fff;
-        border: none;
-        border-radius: 50%;
-        padding: 5px;
-        cursor: pointer;
-        display: none;
-        /* Hide button initially */
-        font-size: 20px;
+    #semester {
+        width: 180px;
     }
     </style>
 </head>
 
 <body>
-    <div class="content-wrapper">
-        <section class="content-header">
-            <div class="container-fluid">
-                <div class="row mb-2">
-                    <div class="col-sm-6">
-                        <h1 class="text-primary">ส่งหลักฐานการชำระเงิน</h1>
-                    </div>
+
+    <div class="card">
+        <h3>เงื่อนไขในการลงทะเบียน</h3>
+        <p>1. นักศึกษาต้องนำเนินการลงทะเบียนด้วยตนเองเท่านั้น ห้ามให้สิทธิ์ผู้อื่นดําเนินการแทน หากมีข้อผิดพลาด
+            ถือว่าเป็นความรับผิดชอบของนักศึกษา</p>
+        <p>2. การลงทะเบียนจะเปิดให้ดําเนินการภายในระยะเวลาที่วิทยาลัยกําหนดไว้ เท่านั้น</p>
+        <p>3. เมื่อแน่ใจในรายวิชาที่ลงทะเบียนแล้วจึงกดปุ่มยืนยันการลงทะเบียน หากไม่ยืนยันจะถือว่าลงทะเบียนวิชานั้นๆ
+            ไม่สําเร็จ</p>
+        <p>4. การลงทะเบียนจะสมบูรณ์เมื่อวิทยาลัยได้รับค่าลงทะเบียนที่นักเรียนชําระถูกต้องตามขั้นตอนเรียบร้อยแล้ว</p>
+        <p>5. นักศึกษาออกจากระบบทุกครั้งเมื่อใช้งานเสร็จเพื่อความปลอดภัยของข้อมูลของนักศึกษา</p>
+        <p>6. นักศึกษาระบุภาคการศึกษาและปีการศึกษา จึงสามารถกดปุ่มลงทะเบียนได้</p>
+
+        <form action="registration.php" method="POST">
+            <div class="input-row">
+                <div class="input-group">
+                    <label for="semester">ภาคการศึกษา</label>
+                    <select id="semester" name="semester">
+                        <option value="">เลือกภาคการศึกษา</option>
+                        <option value="1">1</option>
+                        <option value="2">2</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="schoolYear">ปีการศึกษา</label>
+                    <select id="schoolYear" name="schoolYear">
+                        <option value="">เลือกปีการศึกษา</option>
+                    </select>
                 </div>
             </div>
-        </section>
 
-        <section class="content">
-            <div class="container-fluid">
-                <div class="row">
-                    <div class="col-md-12">
-                        <div class="card card-custom">
-                            <div class="card-header card-header-custom">
-                                <h3 class="card-title">ฟอร์มส่งหลักฐานการชำระเงิน</h3>
-                            </div>
-                            <div class="card-body card-body-custom">
-                                <div class="form-container">
-                                    <form id="paymentForm" method="post" action="" enctype="multipart/form-data">
-                                        <!-- รหัสการลงทะเบียน -->
-                                        <div class="form-group">
-                                            <label for="registrationCode">รหัสการลงทะเบียน</label>
-                                            <input type="text" class="form-control" id="registrationCode"
-                                                name="registrationCode"
-                                                value="<?php echo htmlspecialchars($data['registration_id']); ?>"
-                                                readonly required>
-                                        </div>
-
-                                        <!-- รหัสนักเรียน -->
-                                        <div class="form-group">
-                                            <label for="studentId">รหัสนักเรียน</label>
-                                            <input type="text" class="form-control" id="studentId" name="studentId"
-                                                value="<?php echo htmlspecialchars($data['student_id']); ?>" readonly
-                                                required>
-                                        </div>
-
-                                        <!-- ชื่อ-สกุลนักเรียน -->
-                                        <div class="form-group">
-                                            <label for="studentName">ชื่อ-สกุลนักเรียน</label>
-                                            <input type="text" class="form-control" id="studentName" name="studentName"
-                                                value="<?php echo htmlspecialchars($data['name']); ?>" readonly
-                                                required>
-                                        </div>
-
-                                        <!-- หลักฐานการชำระเงิน -->
-                                        <div class="form-group upload-container">
-                                            <label for="paymentProof">อัปโหลดหลักฐานการชำระเงิน</label>
-                                            <div class="upload-button" id="uploadButton">
-                                                <input type="file" id="paymentProof" name="paymentProof"
-                                                    accept="image/*" required onchange="previewImage(event)">
-                                                <i class="fas fa-upload" id="uploadIcon"></i>
-                                                <span id="uploadText">คลิกที่นี่เพื่ออัปโหลด</span>
-                                                <p id="fileName" class="mt-2"></p> <!-- File name display -->
-                                            </div>
-                                        </div>
-
-                                        <!-- Image preview -->
-                                        <div id="imagePreviewContainer" class="image-preview-container"
-                                            style="display: none;">
-                                            <img id="imagePreview" class="image-preview" src="#" alt="Preview Image">
-                                            <button type="button" class="remove-preview" style="display: none;"
-                                                onclick="removePreview()">
-                                                <i class="fas fa-times"></i>
-                                            </button>
-                                        </div>
-
-                                        <!-- Submit button -->
-                                        <br><button type="submit" class="btn btn-info" id="savePaymentButton"
-                                            onclick="validateForm(event)">บันทึกหลักฐานการชำระเงิน</button>
-
-                                    </form>
-                                </div>
-                                <div class="advice-container">
-                                    <div class="card advice-card">
-                                        <div class="card-header">
-                                            <h4 class="card-title">คำแนะนำในการส่งหลักฐานการชำระเงิน</h4>
-                                        </div>
-                                        <div class="card-body">
-                                            <ul>
-                                                <li>อัปโหลดหลักฐาน: นักศึกษาอัปโหลดภาพหลักฐานการชำระเงินที่มีนามสกุลไฟล์
-                                                    jpg, jpeg, png เท่านั้น</li>
-                                            </ul>
-
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div class="buttons">
+                <button type="submit" class="btn btn-register" id="registerBtn">ลงทะเบียน</button>
+                <a href="../mainstu/index.php" class="btn btn-cancel">ยกเลิก</a>
             </div>
-        </section>
+        </form>
+
     </div>
 
-    <!-- jQuery, Popper.js, and Bootstrap JS -->
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-    <!-- SweetAlert2 JS -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
     <script>
-    // Function to preview image
-    function previewImage(event) {
-        const file = event.target.files[0];
-        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
-        const imagePreview = document.getElementById('imagePreview');
-        const removePreviewBtn = document.querySelector('.remove-preview');
-        const fileNameDisplay = document.getElementById('fileName');
-        const uploadIcon = document.getElementById('uploadIcon');
-        const uploadText = document.getElementById('uploadText');
+    const registerBtn = document.getElementById('registerBtn');
+    const semesterInput = document.getElementById('semester');
+    const schoolYearInput = document.getElementById('schoolYear');
 
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                imagePreview.src = e.target.result;
-                imagePreviewContainer.style.display = 'block';
-                removePreviewBtn.style.display = 'block';
-            };
-            reader.readAsDataURL(file);
+    // Get current year in Thailand
+    const currentYear = new Date().getFullYear() + 543;
+    for (let i = 0; i < 4; i++) {
+        const option = document.createElement('option');
+        option.value = currentYear + i;
+        option.text = currentYear + i;
+        schoolYearInput.appendChild(option);
+    }
 
-            // Hide the upload icon and text, show the file name
-            uploadIcon.style.display = 'none';
-            uploadText.textContent = file.name;
-        } else {
-            fileNameDisplay.textContent = '';
+    document.querySelector('form').addEventListener('submit', function(event) {
+        let errorMessage = '';
+
+        if (semesterInput.value === '' && schoolYearInput.value === '') {
+            errorMessage = 'กรุณาระบุภาคการศึกษาและปีการศึกษา';
+        } else if (semesterInput.value === '') {
+            errorMessage = 'กรุณาระบุภาคการศึกษา';
+        } else if (schoolYearInput.value === '') {
+            errorMessage = 'กรุณาระบุปีการศึกษา';
         }
-    }
 
-    function removePreview() {
-        const imagePreviewContainer = document.getElementById('imagePreviewContainer');
-        const imagePreview = document.getElementById('imagePreview');
-        const fileInput = document.getElementById('paymentProof');
-        const removePreviewBtn = document.querySelector('.remove-preview');
-        const uploadIcon = document.getElementById('uploadIcon');
-        const uploadText = document.getElementById('uploadText');
-
-        fileInput.value = '';
-        imagePreview.src = '#';
-        imagePreviewContainer.style.display = 'none';
-        removePreviewBtn.style.display = 'none';
-
-        // Show the upload icon and reset the text
-        uploadIcon.style.display = 'inline-block';
-        uploadText.textContent = 'คลิกที่นี่เพื่ออัปโหลด';
-    }
-
-    function validateForm(event) {
-        const fileInput = document.getElementById('paymentProof');
-
-        if (!fileInput.value) {
-            // Prevent form submission
-            event.preventDefault();
-
+        if (errorMessage) {
             Swal.fire({
-                title: "กรุณาอัปโหลดรูปภาพเพื่อเป็นหลักฐานการชำระเงิน",
-                icon: "warning",
-                confirmButtonText: "OK",
+                title: 'ข้อผิดพลาด!',
+                text: errorMessage,
+                icon: 'error',
+                confirmButtonText: 'ตกลง'
             });
+            event.preventDefault(); // Prevent form submission if there are errors
         }
-    }
+    });
     </script>
+
 </body>
 
 </html>
