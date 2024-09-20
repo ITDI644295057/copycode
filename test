@@ -1,20 +1,20 @@
 <?php
-include('../config/connect.php'); // เชื่อมต่อฐานข้อมูล
+   include('../config/connect.php'); // เชื่อมต่อฐานข้อมูล
 
 // ดึง student_id จากเซสชัน
-if (isset($_SESSION['student'])) {
+if (isset($_SESSION['teacher'])) {
     // ดึง student_id จากเซสชัน
-    $student_id = $_SESSION['student'];
+    $teacher_num = $_SESSION['teacher'];
 
     // ดึงข้อมูล student จากฐานข้อมูล
-    $query = "SELECT username FROM student WHERE student_id = :student_id";
+    $query = "SELECT username FROM teacher WHERE num_teacher = :num_teacher";
     $stmt = $condb->prepare($query);
-    $stmt->bindParam(':student_id', $student_id, PDO::PARAM_INT);
+    $stmt->bindParam(':num_teacher', $teacher_num, PDO::PARAM_INT);
     $stmt->execute();
-    $student = $stmt->fetch(PDO::FETCH_ASSOC);
+    $teacher = $stmt->fetch(PDO::FETCH_ASSOC);
 
 } else {
-    echo "Student ID is not set in the session.";
+    echo "num_teacher is not set in the session.";
 }
 ?>
 
@@ -113,7 +113,7 @@ if (isset($_SESSION['student'])) {
 
     .advice-container {
         flex: 1;
-        margin-right: 1rem;
+        margin-right: 10rem;
     }
 
     .advice-card {
@@ -167,7 +167,7 @@ if (isset($_SESSION['student'])) {
                                         <div class="form-group">
                                             <label for="username">ชื่อผู้ใช้</label>
                                             <input type="text" class="form-control" id="username" name="username"
-                                                value="<?php echo $student['username']; ?>" required>
+                                                value="<?php echo $teacher['username']; ?>" required>
                                         </div>
 
                                         <div class="form-group">
@@ -279,7 +279,7 @@ if (isset($_SESSION['student'])) {
 
         // AJAX request to handle password change
         $.ajax({
-            url: '../fetch/change_password_process_student.php', // URL to the PHP script
+            url: '../fetch/change_password_process_teacher.php', // URL to the PHP script
             type: 'POST',
             data: formData,
             processData: false,
