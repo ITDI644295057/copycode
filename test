@@ -1,189 +1,370 @@
-<!DOCTYPE html>
-<html lang="th">
+<!-- Content Wrapper. Contains page content -->
 
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>เงื่อนไขในการลงทะเบียน</title>
-    <style>
-    body {
-        font-family: Arial, sans-serif;
-        background-color: #f4f4f4;
-        margin: 0;
-    }
+<div class="content-wrapper">
+    <!-- Content Header (Page header) -->
+    <div class="content-header">
+        <div class="container-fluid">
+            <div class="row mb-2">
+                <div class="col-sm-6">
+                    <!-- Dashboard title removed -->
+                </div><!-- /.col -->
+                <div class="col-sm-6 text-right" style="padding-right: 15px;">
+                    <br>
+                    <h1 class="m-0" id="currentDateTime"></h1>
+                </div><!-- /.col -->
+            </div><!-- /.row -->
+        </div><!-- /.container-fluid -->
+    </div>
+    <!-- /.content-header -->
 
-    .card {
-        background-color: white;
-        padding: 30px;
-        margin: 14px auto;
-        border-radius: 10px;
-        margin-left: 500px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        max-width: 700px;
-    }
-
-    .card h3 {
-        text-align: center;
-        color: #333;
-        margin-bottom: 20px;
-    }
-
-    .card p {
-        font-size: 16px;
-        line-height: 1.8;
-        color: #555;
-        margin-bottom: 10px;
-        text-align: left;
-    }
-
-    .input-row {
-        display: flex;
-        justify-content: flex-start;
-        align-items: center;
-        margin: 20px 0;
-    }
-
-    .input-group {
-        display: flex;
-        align-items: center;
-        margin-left: 20px;
-    }
-
-    .input-group label {
-        font-size: 16px;
-        color: #333;
-        margin-right: 10px;
-    }
-
-    .input-group select {
-        padding: 8px 12px;
-        font-size: 16px;
-        border-radius: 5px;
-        border: 1px solid #ccc;
-        width: 160px;
-        transition: border-color 0.3s;
-    }
-
-    .input-group select:focus {
-        border-color: red;
-        outline: none;
-    }
-
-    .buttons {
-        display: flex;
-        justify-content: center;
-        margin-top: 20px;
-    }
-
-    .btn {
-        padding: 10px 20px;
-        font-size: 16px;
-        border-radius: 5px;
-        text-decoration: none;
-        text-align: center;
-        cursor: pointer;
-        margin: 0 20px;
-    }
-
-    .btn-register {
-        background-color: #007bff;
-        color: white;
-        font-weight: bold;
-    }
-
-    .btn-cancel {
-        background-color: #dc3545;
-        color: white;
-        font-weight: bold;
-    }
-
-    .btn-register.active {
-        pointer-events: auto;
-        opacity: 1;
-    }
-
-    #semester {
-        width: 180px;
-    }
-    </style>
-</head>
-
-<body>
-
-    <div class="card">
-        <h3>เงื่อนไขในการลงทะเบียน</h3>
-        <p>1. นักศึกษาต้องนำเนินการลงทะเบียนด้วยตนเองเท่านั้น ห้ามให้สิทธิ์ผู้อื่นดําเนินการแทน หากมีข้อผิดพลาด
-            ถือว่าเป็นความรับผิดชอบของนักศึกษา</p>
-        <p>2. การลงทะเบียนจะเปิดให้ดําเนินการภายในระยะเวลาที่วิทยาลัยกําหนดไว้ เท่านั้น</p>
-        <p>3. เมื่อแน่ใจในรายวิชาที่ลงทะเบียนแล้วจึงกดปุ่มยืนยันการลงทะเบียน หากไม่ยืนยันจะถือว่าลงทะเบียนวิชานั้นๆ
-            ไม่สําเร็จ</p>
-        <p>4. การลงทะเบียนจะสมบูรณ์เมื่อวิทยาลัยได้รับค่าลงทะเบียนที่นักเรียนชําระถูกต้องตามขั้นตอนเรียบร้อยแล้ว</p>
-        <p>5. นักศึกษาออกจากระบบทุกครั้งเมื่อใช้งานเสร็จเพื่อความปลอดภัยของข้อมูลของนักศึกษา</p>
-        <p>6. นักศึกษาระบุภาคการศึกษาและปีการศึกษา จึงสามารถกดปุ่มลงทะเบียนได้</p>
-
-        <form action="registration.php" method="POST">
-            <div class="input-row">
-                <div class="input-group">
-                    <label for="semester">ภาคการศึกษา</label>
-                    <select id="semester" name="semester">
-                        <option value="">เลือกภาคการศึกษา</option>
-                        <option value="1">1</option>
-                        <option value="2">2</option>
-                    </select>
-                </div>
-                <div class="input-group">
-                    <label for="schoolYear">ปีการศึกษา</label>
-                    <select id="schoolYear" name="schoolYear">
-                        <option value="">เลือกปีการศึกษา</option>
-                    </select>
-                </div>
-            </div>
-
-            <div class="buttons">
-                <button type="submit" class="btn btn-register" id="registerBtn">ลงทะเบียน</button>
-                <a href="../mainstu/index.php" class="btn btn-cancel">ยกเลิก</a>
-            </div>
-        </form>
-
+    <!-- Image placed below date and time -->
+    <div class="text-center mb-4">
+        <img src="../assets/dist/img/header.png" alt="Header Image" style="max-width: 100%; height: auto;">
     </div>
 
-    <script>
-    const registerBtn = document.getElementById('registerBtn');
-    const semesterInput = document.getElementById('semester');
-    const schoolYearInput = document.getElementById('schoolYear');
+    <!-- Main content -->
+    <section class="content">
+        <div class="container-fluid">
+            <!-- Small boxes (Stat box) -->
+            <div class="row">
+                <!-- Small boxes (statistic) -->
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-success">
+                        <div class="inner">
+                            <h3 id="total-deposits" class="large-text">0</h3>
+                            <p class="medium-text">จำนวนนักศึกษาทั้งหมด(คน)</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-user-graduate"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-danger">
+                        <div class="inner">
+                            <h3 id="total-withdrawals" class="large-text">0</h3>
+                            <p class="medium-text">จำนวนนักศึกษาลงทะเบียน(คน)</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-clipboard-list"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-warning">
+                        <div class="inner">
+                            <h3 id="total-borrowings" class="large-text">0</h3>
+                            <p class="medium-text">จำนวนนักศึกษาชำระเงิน(คน)</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-money-check-alt"></i>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-3 col-6">
+                    <div class="small-box bg-info">
+                        <div class="inner">
+                            <h3 id="total-balance" class="large-text">0</h3>
+                            <p class="medium-text">จำนวนเงินชำระค่าเทอม(บาท)</p>
+                        </div>
+                        <div class="icon">
+                            <i class="fas fa-dollar-sign"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-    // Get current year in Thailand
-    const currentYear = new Date().getFullYear() + 543;
-    for (let i = 0; i < 4; i++) {
-        const option = document.createElement('option');
-        option.value = currentYear + i;
-        option.text = currentYear + i;
-        schoolYearInput.appendChild(option);
-    }
+            <!-- Statistics Section with Chart.js -->
+            <div class="container-fluid mt-4">
+                <div class="row">
+                    <!-- First chart -->
+                    <div class="col-lg-6 col-md-12">
+                        <div class="card" style="height: 100%;">
+                            <div class="card-body">
+                                <h3 class="card-title text-center" id="studentChartTitle">กราฟจำนวนนักศึกษาลงทะเบียน
+                                </h3><br><br>
 
-    document.querySelector('form').addEventListener('submit', function(event) {
-        let errorMessage = '';
+                                <!-- Dropdown for academic year -->
+                                <label for="academicYear"> เลือกปีการศึกษา:</label>
+                                <select id="academicYear" onchange="updateChart()">
+                                    <option value="2567">2567</option>
+                                    <option value="2568">2568</option>
+                                    <option value="2569">2569</option>
+                                </select>
+                                <canvas id="studentChart" style="width: 100%; height: 400px;"></canvas>
+                            </div>
+                        </div>
+                    </div>
 
-        if (semesterInput.value === '' && schoolYearInput.value === '') {
-            errorMessage = 'กรุณาระบุภาคการศึกษาและปีการศึกษา';
-        } else if (semesterInput.value === '') {
-            errorMessage = 'กรุณาระบุภาคการศึกษา';
-        } else if (schoolYearInput.value === '') {
-            errorMessage = 'กรุณาระบุปีการศึกษา';
-        }
+                    <!-- Second chart -->
+                    <div class="col-lg-6 col-md-12">
+                        <div class="card" style="height: 100%;">
+                            <div class="card-body">
+                                <h5 class="card-title text-center">กราฟการชำระค่าเทอม</h5><br><br><br>
+                                <canvas id="paymentChart" style="width: 100%; height: 400px;"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-        if (errorMessage) {
-            Swal.fire({
-                title: 'ข้อผิดพลาด!',
-                text: errorMessage,
-                icon: 'error',
-                confirmButtonText: 'ตกลง'
+            <!-- Summary Card for Recent Activities -->
+            <div class="row">
+                <div class="col-lg-12">
+                    <div class="card" style="margin-top: 30px;">
+                        <div class="card-header">
+                            <h3 class="card-title">
+                                ข้อมูลการชำระเงิน
+                                ภาคเรียนที่
+                                <select id="termDropdown" class="form-select" style="display:inline-block; width:auto;">
+                                    <option value="1">1</option>
+                                    <option value="2">2</option>
+                                </select>
+                                ปีการศึกษา
+                                <select id="yearDropdown" class="form-select" style="display:inline-block; width:auto;">
+                                    <option value="2567">2567</option>
+                                    <option value="2568">2568</option>
+                                    <option value="2569">2569</option>
+                                    <option value="2570">2570</option>
+                                </select>
+                            </h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="row text-center">
+                                <div class="col-md-4">
+                                    <h5 class="font-weight-bold" style="color: rgba(255, 99, 132, 1);">
+                                        จำนวนนักศึกษาที่โอนผ่านธนาคาร</h5>
+                                    <h3 id="recent-deposits" class="font-size-lg">0 คน</h3>
+                                </div>
+                                <div class="col-md-4">
+                                    <h5 class="font-weight-bold" style="color: rgba(54, 162, 235, 1);">
+                                        จำนวนนักศึกษาที่ผ่อนชำระ</h5>
+                                    <h3 id="recent-withdrawals" class="font-size-lg">0 คน</h3>
+                                </div>
+                                <div class="col-md-4">
+                                    <h5 class="font-weight-bold" style="color: rgba(0, 128, 0, 1);">
+                                        จำนวนนักศึกษาที่ชำระเงินสด</h5>
+                                    <h3 id="recent-borrowings" class="font-size-lg">0 คน</h3>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- /.content-wrapper -->
+
+            <!-- Add this script tag at the end of your body tag -->
+            <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+            <script>
+            // Data and functions for the page
+
+            // Format date in Thai
+            function formatDateThai(date) {
+                const monthsThai = [
+                    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+                    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+                ];
+                const day = date.getDate();
+                const month = monthsThai[date.getMonth()];
+                const year = date.getFullYear() + 543; // Convert to Buddhist year
+                const hours = date.getHours().toString().padStart(2, '0');
+                const minutes = date.getMinutes().toString().padStart(2, '0');
+                const seconds = date.getSeconds().toString().padStart(2, '0');
+                return `${day} ${month} ${year} ${hours}:${minutes}:${seconds}`;
+            }
+
+            function updateDateTime() {
+                const now = new Date();
+                document.getElementById('currentDateTime').innerText = formatDateThai(now);
+            }
+
+            // Update date and time every second
+            setInterval(updateDateTime, 1000);
+            // Set initial date and time
+            updateDateTime();
+
+            // Create initial student chart
+            const registrationData = {
+                '2567': {
+                    '1': [0, 0, 0, 0, 0], // Placeholder data
+                    '2': [0, 0, 0, 0, 0] // Placeholder data
+                }
+            };
+
+            // Create student chart
+            const ctx = document.getElementById('studentChart').getContext('2d');
+            const studentChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['ปวช.1', 'ปวช.2', 'ปวช.3', 'ปวส.1', 'ปวส.2'],
+                    datasets: [{
+                        label: 'ภาคเรียนที่ 1',
+                        data: registrationData['2567']['1'],
+                        backgroundColor: 'rgba(255, 45, 33, 0.6)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+                    }, {
+                        label: 'ภาคเรียนที่ 2',
+                        data: registrationData['2567']['2'],
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'ระดับชั้นปี'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'นักศึกษา (คน)'
+                            },
+                            suggestedMax: Math.max(...registrationData['2567']['1'], ...registrationData['2567']
+                                ['2']) + 9
+                        }
+                    }
+                }
             });
-            event.preventDefault(); // Prevent form submission if there are errors
-        }
-    });
-    </script>
 
-</body>
+            // Update chart function
+            function updateChart() {
+                const selectedYear = document.getElementById('academicYear').value;
 
-</html>
+                // AJAX request to fetch data
+                $.getJSON(`../fetch/total_registered_students.php?school_year=${selectedYear}`, function(data) {
+                    // Update chart data
+                    studentChart.data.datasets[0].data = data['1']; // Data for Semester 1
+                    studentChart.data.datasets[1].data = data['2']; // Data for Semester 2
+                    studentChart.options.plugins.title.text =
+                        `กราฟนักศึกษาลงทะเบียน ปีการศึกษา ${selectedYear}`;
+                    studentChart.update();
+                });
+            }
+
+            // Event listener for dropdown change
+            document.getElementById('academicYear').addEventListener('change', updateChart);
+
+            // Initial chart load
+            updateChart();
+            // Create payment chart
+            document.addEventListener('DOMContentLoaded', function() {
+                fetch('../fetch/fetch_tuition_payment.php')
+                    .then(response => response.json())
+                    .then(data => {
+                       // หากข้อมูลว่าง ให้แสดงปีปัจจุบันและอีก 3 ปีถัดไป
+                        const currentYear = new Date().getFullYear() + 543; // ปีปัจจุบันของไทย
+                        const labels = data.length > 0 ? data.map(item => item.school_year) : [currentYear, currentYear + 1, currentYear + 2, currentYear + 3];
+                        const bankTransferData = data.length > 0 ? data.map(item => item.bank_transfer) : [0, 0, 0, 0];
+                        const installmentPaymentData = data.length > 0 ? data.map(item => item.installment_payment) : [0, 0, 0, 0];
+                        const cashPaymentData = data.length > 0 ? data.map(item => item.cash_payment) : [0, 0, 0, 0];
+
+                        // หาค่าสูงสุด หากไม่มีข้อมูล ให้ใช้ 10,000 บาทเป็นค่าสูงสุด
+                        const allData = [...bankTransferData, ...installmentPaymentData, ...cashPaymentData];
+                        const maxValue = Math.max(...allData);
+                        const maxY = allData.length > 0 ? Math.ceil((maxValue + 500)/1000) * 1000 : 10000; // Set maximum value
+
+                        // Create the chart
+                        const ctx = document.getElementById('paymentChart').getContext('2d');
+                        new Chart(ctx, {
+                            type: 'line',
+                            data: {
+                                labels: labels,
+                                datasets: [{
+                                        label: 'โอนผ่านธนาคาร',
+                                        data: bankTransferData,
+                                        backgroundColor: 'rgba(255, 99, 132, 0.7)',
+                                        borderColor: 'rgba(255, 99, 132, 1)',
+                                        borderWidth: 1
+                                    },
+                                    {
+                                        label: 'ผ่อนชำระ',
+                                        data: installmentPaymentData,
+                                        backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                                        borderColor: 'rgba(54, 162, 235, 1)',
+                                        borderWidth: 1
+                                    },
+                                    {
+                                        label: 'ชำระเงินสด',
+                                        data: cashPaymentData,
+                                        backgroundColor: 'rgba(0, 255, 0, 0.7)',
+                                        borderColor: 'rgba(0, 255, 0, 1)',
+                                        borderWidth: 1
+                                    }
+                                ]
+                            },
+                            options: {
+                                scales: {
+                                    x: {
+                                        title: {
+                                            display: true,
+                                            text: 'ปีการศึกษา'
+                                        }
+                                    },
+                                    y: {
+                                        beginAtZero: true,
+                                        max: maxY, 
+                                        title: {
+                                            display: true,
+                                            text: 'จำนวนเงิน(บาท)'
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    })
+                    .catch(error => console.error('Error fetching data:', error));
+            });
+
+            // Fetch and update statistics
+            $(document).ready(function() {
+                $.getJSON('../fetch/fetch_values_data.php', function(data) {
+                    $('#total-deposits').text(Number(data.total_students).toLocaleString());
+                    $('#total-withdrawals').text(Number(data.total_registered_students)
+                        .toLocaleString());
+                    $('#total-borrowings').text(Number(data.total_students_paid).toLocaleString());
+                    $('#total-balance').text(Number(data.total_tuition_paid).toLocaleString());
+                });
+            });
+
+            $(document).ready(function() {
+                function fetchStatistics(semester, school_year) {
+                    $.post('../fetch/payment_information.php', {
+                        semester: semester,
+                        school_year: school_year
+                    }, function(data) {
+                        if (!data.error) {
+                            $('#recent-deposits').text(Number(data.bank_transfer).toLocaleString() +
+                                ' คน');
+                            $('#recent-withdrawals').text(Number(data.installment_payment)
+                                .toLocaleString() + ' คน');
+                            $('#recent-borrowings').text(Number(data.cash_payment).toLocaleString() +
+                                ' คน');
+                        } else {
+                            console.error(data.error);
+                        }
+                    }, 'json');
+                }
+
+                // Call fetchStatistics when the page loads with default values
+                fetchStatistics($('#termDropdown').val(), $('#yearDropdown').val());
+
+                // Add event listeners for the dropdowns
+                $('#termDropdown, #yearDropdown').change(function() {
+                    const semester = $('#termDropdown').val();
+                    const school_year = $('#yearDropdown').val();
+                    fetchStatistics(semester, school_year);
+                });
+            });
+            </script>
+        </div><!-- /.container-fluid -->
+    </section><!-- /.content -->
+</div><!-- /.content-wrapper -->
