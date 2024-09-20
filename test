@@ -1,210 +1,210 @@
-<?php
-include '../config/connect.php';
-
-// กำหนดค่าเริ่มต้นของตัวแปร $student ให้เป็น null
-$student = null;
-$student_id = isset($_SESSION['student']) ? $_SESSION['student'] : null;
-
-try {
-    if ($student_id) {
-        // คำสั่ง SQL สำหรับการดึงข้อมูลนักศึกษา
-        $sql = "SELECT
-                    s.student_id,
-                    s.ID_card,
-                    s.name,
-                    s.phone,
-                    s.admit,
-                    s.learner_type,
-                    s.student_status,
-                    s.enrollment_year,
-                    m.major_name,
-                    m.field_of_work_name,
-                    c.class_year,
-                    sg.study_group_id,
-                    sg.study_group_name,
-                    t.name_sername,
-                    t.position,
-                    t.phone AS teacher_phone
-                FROM
-                    student s
-                JOIN major m ON s.major_id = m.major_id
-                JOIN class c ON s.class_id = c.class_id
-                JOIN study_group sg ON c.study_group_id = sg.study_group_id
-                JOIN class_teacher ct ON s.class_id = ct.class_id
-                JOIN teacher t ON ct.num_teacher = t.num_teacher
-                WHERE
-                    s.student_id = :student_id";
-
-        // เตรียม statement
-        $stmt = $condb->prepare($sql);
-        $stmt->bindParam(':student_id', $student_id, PDO::PARAM_STR);
-
-        // รันคำสั่ง SQL
-        $stmt->execute();
-
-        // ดึงข้อมูล
-        $student = $stmt->fetch();
-
-        if (!$student) {
-            echo "ไม่พบนักศึกษาที่มีรหัส $student_id";
-        }
-    } else {
-        echo "กรุณาระบุรหัสนักศึกษา";
-    }
-} catch (PDOException $e) {
-    echo "การเชื่อมต่อฐานข้อมูลล้มเหลว: " . $e->getMessage();
-}
-?>
-
-
 <!DOCTYPE html>
 <html lang="th">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ข้อมูลประวัตินักศึกษา</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Custom CSS -->
+    <title>หน้าหลัก</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <style>
-    .profile-card {
-        padding: 1rem;
-        /* Reduce padding */
-        border: 1px solid #dee2e6;
-        border-radius: .375rem;
-        background-color: #f8f9fa;
-        box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.1);
+    .card-fullscreen {
         width: 100%;
-        max-width: 700px;
-        margin-left: 200px;
-        margin-bottom: 1rem;
+        border: 1px solid #ddd;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
 
-    .profile-card-header {
-        margin-bottom: 0.5rem;
-        font-size: 1.4rem;
+    .card-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2rem;
+        /* Adjust the gap between cards */
+    }
+
+    .card-item {
+        flex: 1 1 calc(50% - 2rem);
+        /* Make cards 50% width minus gap */
+        margin: 0.5rem;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .card-body {
+        flex: 1;
+        min-height: 400px;
+        /* Increase the minimum height for both cards */
+    }
+
+    .map-iframe {
+        width: 100%;
+        height: 100%;
+        /* Ensure the iframe takes full height of the card */
+        border: 0;
+    }
+
+    .facebook-link {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin-top: 20px;
+    }
+
+    .facebook-header {
+        font-size: 1.2rem;
         font-weight: bold;
-        color: #007bff;
-    }
-
-    .profile-card-body {
-        margin-bottom: 0.5rem;
-    }
-
-    table {
+        margin-bottom: 10px;
+        text-align: left;
+        /* หรือเปลี่ยนเป็น left หากต้องการจัดตำแหน่งซ้าย */
         width: 100%;
-        max-width: 1200px;
-        margin-bottom: 1rem;
-        border-collapse: collapse;
+        /* ใช้เพื่อให้แน่ใจว่าหัวข้อใช้ความกว้างทั้งหมดของคอนเทนเนอร์ */
+        box-sizing: border-box;
+        /* ใช้เพื่อให้การตั้งค่าความกว้างและมาร์จิ้นทำงานร่วมกัน */
     }
 
-    table td {
-        padding: 0.5rem;
-        border: 1px solid #dee2e6;
-        font-size: 0.9rem;
-        position: relative;
+    .facebook-button,
+    .website-button {
+        color: #fff;
+        padding: 10px;
+        font-size: 1.5rem;
+        border: none;
+        border-radius: 5px;
+        text-decoration: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 50px;
+        height: 50px;
     }
 
-    .btn-warning {
-        float: right;
-        margin-right: 5px;
-        font-size: 0.8rem;
+    .facebook-btn {
+        background-color: #3b5998;
+        margin-right: 50px;
+        /* Add spacing between the buttons */
+    }
+
+    /* Website button specific styles */
+    .website-btn {
+        background-color: #0056b3;
+    }
+
+    /* Hover effects */
+    .facebook-btn:hover,
+    .website-btn:hover,
+    .facebook-btn:focus,
+    .website-btn:focus {
+        color: #fff;
+        /* Keep text color white */
+        text-decoration: none;
+        /* Prevent underline */
     }
     </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 
 <body>
-    <div class="container mt-5">
-        <div class="profile-card">
-            <div class="profile-card-header">ข้อมูลส่วนบุคคล</div>
-            <div class="profile-card-body">
-                <?php if ($student): ?>
-                <table>
-                    <tr>
-                        <td>รหัสประจำตัว</td>
-                        <td><?php echo htmlspecialchars($student['student_id']); ?></td>
-                    </tr>
-                    <tr>
-                        <td>เลขประจำตัวประชาชน</td>
-                        <td>
-                            <?php echo htmlspecialchars($student['ID_card']); ?>
-                        </td>
-                    </tr>
+    <!-- Content Wrapper. Contains page content -->
+    <div class="content-wrapper">
+        <!-- Content Header (Page header) -->
+        <div class="content-header">
+            <div class="container-fluid">
+                <div class="row mb-2">
+                    <div class="col-sm-6">
+                        <!-- Dashboard title removed -->
+                    </div><!-- /.col -->
+                    <div class="col-sm-6 text-right" style="padding-right: 15px;">
+                        <br>
+                        <h1 class="m-0" id="currentDateTime"></h1>
+                    </div><!-- /.col -->
+                </div><!-- /.row -->
+            </div><!-- /.container-fluid -->
+        </div>
+        <!-- /.content-header -->
 
-                    <tr>
-                        <td>ชื่อ-นามสกุล</td>
-                        <td>
-                            <?php echo htmlspecialchars($student['name']); ?>
-                        </td>
-                    </tr>
+        <!-- Image placed below date and time -->
+        <div class="text-center">
+            <img src="../assets/dist/img/header.png" alt="Header Image" style="max-width: 100%; height: auto;">
+        </div>
 
-                    <tr>
-                        <td>เบอร์โทร</td>
-                        <td>
-                            <?php echo htmlspecialchars($student['phone']); ?>
-                        </td>
-                    </tr>
+        <!-- Two-column layout with Bootstrap grid system -->
+        <div class="container mt-4">
+            <div class="card-container">
+                <!-- Left card (with address) -->
+                <div class="card-item">
+                    <div class="card card-fullscreen">
+                        <div class="card-body" style="background-color: #f8f9fa; padding: 20px;">
+                            <h5 class="card-title" style="font-size: 1.2rem; font-weight: bold; margin-bottom: 20px;">
+                                ที่อยู่</h5>
+                            <p class="card-text" style="font-size: 1rem; line-height: 1.6; padding-left: 25px;">
+                                99 หมู่ 1 ตำบลตูม อำเภอปักธงชัย จังหวัดนครราชสีมา 30150<br>
+                                <strong>เวลาทำการ :</strong> วันจันทร์-วันศุกร์ เวลา 08.00-17.00 น.<br>
+                                <strong>E-MAIL :</strong> PTC_PAK@hotmail.co.th<br>
+                                <strong>โทรศัพท์ :</strong> 044-756359<br>
+                                <strong>โทรสาร :</strong> 044-756359
+                            </p>
+                            <!-- Facebook Link -->
+                            <div class="facebook-link">
+                                <div class="facebook-header">ช่องทางการติดต่อ</div>
+                                <div class="d-flex justify-content-center">
+                                    <a href="https://www.facebook.com/ptcpak?ref=embed_page" target="_blank"
+                                        class="facebook-button facebook-btn">
+                                        <i class="fab fa-facebook-f"></i>
+                                    </a>
+                                    <a href="https://www.technicpak.ac.th/" target="_blank"
+                                        class="website-button website-btn">
+                                        <i class="fas fa-globe"></i>
+                                    </a>
+                                </div>
+                            </div>
 
+                        </div>
+                    </div>
+                </div>
 
-                    <tr>
-                        <td>วิธีรับเข้า</td>
-                        <td><?php echo htmlspecialchars($student['admit']); ?></td>
-                    </tr>
-                    <tr>
-                        <td>ประเภทผู้เรียน</td>
-                        <td><?php echo htmlspecialchars($student['learner_type']); ?></td>
-                    </tr>
-                    <tr>
-                        <td>สถานะนักเรียน/นักศึกษา</td>
-                        <td><?php echo htmlspecialchars($student['student_status']); ?></td>
-                    </tr>
-                    <tr>
-                        <td>ปีที่เข้าเรียน</td>
-                        <td><?php echo htmlspecialchars($student['enrollment_year']); ?></td>
-                    </tr>
-                    <tr>
-                        <td>ประเภทวิชา</td>
-                        <td><?php echo htmlspecialchars($student['major_name']); ?></td>
-                    </tr>
-                    <tr>
-                        <td>ชื่อสาขางาน</td>
-                        <td><?php echo htmlspecialchars($student['field_of_work_name']); ?></td>
-                    </tr>
-                    <tr>
-                        <td>ชั้นปี</td>
-                        <td><?php echo htmlspecialchars($student['class_year']); ?></td>
-                    </tr>
-                    <tr>
-                        <td>รหัสกลุ่มเรียน</td>
-                        <td><?php echo htmlspecialchars($student['study_group_id']); ?></td>
-                    </tr>
-                    <tr>
-                        <td>ชื่อกลุ่มเรียน</td>
-                        <td><?php echo htmlspecialchars($student['study_group_name']); ?></td>
-                    </tr>
-                    <tr>
-                        <td>ครูประจำชั้น</td>
-                        <td><?php echo htmlspecialchars($student['name_sername']); ?></td>
-                    </tr>
-                    <tr>
-                        <td>ตำแหน่ง</td>
-                        <td><?php echo htmlspecialchars($student['position']); ?></td>
-                    </tr>
-                    <tr>
-                        <td>เบอร์โทรครู</td>
-                        <td><?php echo htmlspecialchars($student['teacher_phone']); ?></td>
-                    </tr>
-                </table>
-                <?php else: ?>
-                <p>ไม่พบข้อมูลนักศึกษา</p>
-                <?php endif; ?>
+                <!-- Right card (with map) -->
+                <div class="card-item">
+                    <div class="card card-fullscreen">
+                        <div class="card-body" style="background-color: #f8f9fa; padding: 0;">
+                            <iframe class="map-iframe"
+                                src="https://www.google.com/maps/embed?pb=!1m14!1m8!1m3!1d15628.373566642523!2d101.9734228!3d14.6758033!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x311c022ce2ed9ffb%3A0x10b0b125d9eeed9f!2sวิทยาลัยเทคนิคปักธงชัย!5e0!3m2!1sth!2sth!4v1694623813400!5m2!1sth!2sth"
+                                allowfullscreen></iframe>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
+        <!-- /.container -->
+
     </div>
+    <!-- /.content-wrapper -->
 
+    <!-- Add this script tag at the end of your body tag -->
+    <script>
+    function formatDateThai(date) {
+        const monthsThai = [
+            "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
+            "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
+        ];
+        const day = date.getDate();
+        const month = monthsThai[date.getMonth()];
+        const year = date.getFullYear() + 543; // Convert to Buddhist year
+        const hours = date.getHours().toString().padStart(2, '0');
+        const minutes = date.getMinutes().toString().padStart(2, '0');
+        const seconds = date.getSeconds().toString().padStart(2, '0');
+        return `${day} ${month} ${year} ${hours}:${minutes}:${seconds}`;
+    }
 
+    function updateDateTime() {
+        const now = new Date();
+        document.getElementById('currentDateTime').innerText = formatDateThai(now);
+    }
 
+    // Update date and time every second
+    setInterval(updateDateTime, 1000);
+    // Set initial date and time
+    updateDateTime();
+    </script>
 </body>
 
 </html>
