@@ -1,370 +1,1286 @@
-<!-- Content Wrapper. Contains page content -->
+<?php
+require_once '../config/connect.php';// เชื่อมต่อฐานข้อมูล
 
-<div class="content-wrapper">
-    <!-- Content Header (Page header) -->
-    <div class="content-header">
-        <div class="container-fluid">
-            <div class="row mb-2">
-                <div class="col-sm-6">
-                    <!-- Dashboard title removed -->
-                </div><!-- /.col -->
-                <div class="col-sm-6 text-right" style="padding-right: 15px;">
-                    <br>
-                    <h1 class="m-0" id="currentDateTime"></h1>
-                </div><!-- /.col -->
-            </div><!-- /.row -->
-        </div><!-- /.container-fluid -->
+    $student_id = isset($_SESSION['student']) ? $_SESSION['student'] : null;
+    // Prepare SQL statement
+    $sql = "SELECT 
+            s.student_id AS 'รหัสประจำตัว', 
+            s.phone AS 'เบอร์โทร', 
+            s.name AS 'ชื่อ-นามสกุล', 
+            c.class_year AS 'ชั้น', 
+            r.semester AS 'ภาคเรียนที่', 
+            sg.study_group_id AS 'กลุ่มเรียน', 
+            sg.study_group_name AS 'ชื่อกลุ่มเรียน', 
+            m.major_name AS 'สาขาวิชา', 
+            m.field_of_work_name AS 'สาขางาน', 
+            rd.registration_date AS 'วันที่ลงทะเบียน',
+            r.school_year AS 'ปีการศึกษา',
+            r.semester AS 'ภาคการศึกษา'
+            FROM  student s
+            JOIN 
+            registration r ON s.student_id = r.student_id
+            JOIN 
+            registration_details rd ON r.registration_id = rd.registration_id
+            JOIN 
+            major m ON s.major_id = m.major_id
+            JOIN 
+            class c ON s.class_id = c.class_id
+            JOIN 
+            study_group sg ON c.study_group_id = sg.study_group_id
+            WHERE 
+            s.student_id = :student_id ";
+
+    $stmt = $condb->prepare($sql);
+    $stmt->bindParam(':student_id', $student_id); // Bind the student ID from query string
+    $stmt->execute();
+
+    // Fetch the result
+    $result = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    $originalDate = $result['วันที่ลงทะเบียน'];
+
+    // แปลงเป็น timestamp
+    $timestamp = strtotime($originalDate);
+
+    // แปลงวันที่เป็นวัน/เดือน/ปีพุทธศักราช
+    $thaiDate = date('d/m/', $timestamp) . (date('Y', $timestamp) + 543);
+
+    // Second SQL statement to get subject details
+    $sqlSubjectDetails = "SELECT 
+        s.subject_id AS รหัสวิชา,
+        s.subject_name AS รายวิชา,
+        s.total_class_hours AS ชั่วโมงเรียนทั้งหมด,
+        s.theory_hours AS ชั่วโมงทฤษฎี,
+        s.hours_of_practice AS ชั่วโมงปฎิบัติ,
+        s.num_credits AS จำนวนหน่วยกิต,
+        s.course_registration_fee AS ค่าลงทะเบียนเรียนรายวิชา,
+        s.practice_fee AS ค่าวัสดุฝึกภาคปฏิบัติ
+        FROM 
+            registration r
+        JOIN 
+            registration_details rd ON r.registration_id = rd.registration_id
+        JOIN 
+            subject s ON rd.subject_id = s.subject_id
+        WHERE 
+            r.student_id = :student_id;";
+
+    $stmtSubjectDetails = $condb->prepare($sqlSubjectDetails);
+    $stmtSubjectDetails->bindParam(':student_id', $student_id);
+    $stmtSubjectDetails->execute();
+
+    $subjectDetails = $stmtSubjectDetails->fetchAll(PDO::FETCH_ASSOC);
+
+    $sqlRegistration = "SELECT registration_id FROM registration WHERE student_id = :student_id";
+    $stmtRegistration = $condb->prepare($sqlRegistration);
+    $stmtRegistration->bindParam(':student_id', $student_id);
+    $stmtRegistration->execute();
+    $registrationData = $stmtRegistration->fetch(PDO::FETCH_ASSOC);
+    $registration_id = $registrationData['registration_id'];
+
+    $sqlAdmit = "SELECT admit FROM student WHERE student_id = :student_id";
+    $stmtAdmit = $condb->prepare($sqlAdmit);
+    $stmtAdmit->bindParam(':student_id', $student_id);
+    $stmtAdmit->execute();
+    $admitData = $stmtAdmit->fetch(PDO::FETCH_ASSOC);
+    $admit = $admitData['admit'];
+
+    $sqlFee = "
+        SELECT fee_id
+        FROM fee f
+        JOIN student s ON s.student_id = :student_id
+        JOIN class c ON c.class_id = s.class_id
+        WHERE f.application_round = s.admit
+        AND LEFT(f.grade_level, 3) = LEFT(c.class_year, 3)
+        AND f.application_round = :admit
+        LIMIT 1";
+    $stmtFee = $condb->prepare($sqlFee);
+    $stmtFee->bindParam(':student_id', $student_id);
+    $stmtFee->bindParam(':admit', $admit);
+    $stmtFee->execute();
+    $feeData = $stmtFee->fetch(PDO::FETCH_ASSOC);
+    $fee_id = $feeData['fee_id'];
+    
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        // รับค่าจาก JavaScript ผ่าน POST
+        $total_money = isset($_POST['total_money']) ? (double) $_POST['total_money'] : 0.00;
+        $fine = isset($_POST['penalty']) ? (double) $_POST['penalty'] : 0.00;
+
+    // ตรวจสอบว่ามี registration_id อยู่แล้วในตาราง tuition_payment_slip หรือไม่
+    $sqlCheckSlip = "
+        SELECT tuition_payment_slip_number 
+        FROM tuition_payment_slip 
+        WHERE registration_id = :registration_id
+        LIMIT 1";
+    $stmtCheckSlip = $condb->prepare($sqlCheckSlip);
+    $stmtCheckSlip->bindParam(':registration_id', $registration_id);
+    $stmtCheckSlip->execute();
+    $existingSlip = $stmtCheckSlip->fetch(PDO::FETCH_ASSOC);
+    
+    if ($existingSlip) {
+       
+       
+        // หากมี registration_id อยู่แล้ว, ทำการอัปเดต print_date และ print_time
+        $sqlUpdateSlip = "
+            UPDATE tuition_payment_slip 
+            SET print_date = CURDATE(), print_time = CURTIME() 
+            WHERE registration_id = :registration_id";
+        $stmtUpdateSlip = $condb->prepare($sqlUpdateSlip);
+        $stmtUpdateSlip->bindParam(':registration_id', $registration_id);
+        $stmtUpdateSlip->execute();
+    } else {
+        // ถ้าไม่มี registration_id, ให้ทำการ insert ข้อมูลใหม่
+        $sqlMaxSlipNumber = "
+            SELECT MAX(tuition_payment_slip_number) AS max_slip_number 
+            FROM tuition_payment_slip";
+        $stmtMaxSlipNumber = $condb->prepare($sqlMaxSlipNumber);
+        $stmtMaxSlipNumber->execute();
+        $slipNumberData = $stmtMaxSlipNumber->fetch(PDO::FETCH_ASSOC);
+
+        $maxSlipNumber = $slipNumberData['max_slip_number'];
+
+        // Default to '190900000000000001' if no records are found
+        if ($maxSlipNumber === null) {
+            $nextSlipNumber = '190900000000000001';
+        } else {
+            // Increment the current maximum slip number by 1
+            $nextSlipNumber = str_pad(bcadd($maxSlipNumber, '1'), 18, '0', STR_PAD_LEFT);
+        }
+
+        // Insert ข้อมูลใหม่
+        $sqlInsertSlip = "
+            INSERT INTO tuition_payment_slip (
+                tuition_payment_slip_number, print_date, print_time, registration_id, fee_id, fine, total_money
+            ) VALUES (
+                :nextSlipNumber, CURDATE(), CURTIME(), :registration_id, :fee_id, :fine, :total_money
+            )";
+        $stmtInsertSlip = $condb->prepare($sqlInsertSlip);
+        $stmtInsertSlip->bindParam(':nextSlipNumber', $nextSlipNumber);
+        $stmtInsertSlip->bindParam(':registration_id', $registration_id);
+        $stmtInsertSlip->bindParam(':fee_id', $fee_id);
+        $stmtInsertSlip->bindParam(':fine', $fine);
+        $stmtInsertSlip->bindParam(':total_money', $total_money);
+        $stmtInsertSlip->execute();
+    }
+        }
+?>
+<!DOCTYPE html>
+<html lang="th">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ใบแจ้งชำระเงินค่าเทอม</title>
+
+    <!-- Font Awesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@400;700&display=swap" rel="stylesheet">
+
+    <link href="https://fonts.googleapis.com/css2?family=TH+Niramit+AS:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- html2pdf.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.2/html2pdf.bundle.min.js"></script>
+
+    <style>
+    @font-face {
+        font-family: 'TH Sarabun New';
+        src: url('fonts/THSarabunNew.ttf') format('truetype'),
+            url('fonts/THSarabunNew.woff') format('woff');
+        font-weight: normal;
+        font-style: normal;
+    }
+
+    @font-face {
+        font-family: 'TH Sarabun New';
+        src: url('fonts/THSarabunNew-Bold.ttf') format('truetype'),
+            url('fonts/THSarabunNew-Bold.woff') format('woff');
+        font-weight: bold;
+        font-style: normal;
+    }
+
+    body {
+
+        /* เปลี่ยนฟอนต์ */
+        font-size: 16px;
+        /* กำหนดขนาดฟอนต์ */
+        color: #000;
+        margin: 0;
+        padding: 0;
+        background-color: #f8f8f8;
+        position: relative;
+        min-height: 100vh;
+    }
+
+    .text-left {
+        text-align: left;
+    }
+
+    .logo {
+        height: 115px;
+        /* Adjust the height as needed */
+        width: auto;
+        /* Maintain aspect ratio */
+        margin-right: 10px;
+        /* Add margin if needed */
+    }
+
+    .container {
+        width: 210mm;
+        /* A4 width */
+        height: 297mm;
+        /* A4 height */
+        margin: 20px auto;
+        background-color: #fff;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        box-sizing: border-box;
+        position: relative;
+    }
+
+    .title-section {
+        text-align: center;
+        margin-bottom: 20px;
+    }
+
+    .title {
+        font-family: 'TH Sarabun New', sans-serif;
+        font-size: 25px;
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+
+    .subtitle {
+        font-family: 'TH Sarabun New', sans-serif;
+        font-size: 22px;
+        color: #555;
+        font-weight: bold;
+    }
+
+    .section-title-box {
+        font-family: 'TH Sarabun New', sans-serif;
+        border: 1px solid #000;
+        padding: 1px;
+        font-size: 18px;
+        font-weight: bold;
+        text-align: center;
+        width: fit-content;
+        margin-left: auto;
+        margin-bottom: 0;
+        padding-left: 20px;
+        /* ปรับระยะห่างจากขอบซ้าย */
+        padding-right: 20px;
+        /* ปรับระยะห่างจากขอบขวา */
+    }
+
+    .details-box {
+        font-family: 'TH Sarabun New', sans-serif;
+        border: 1px solid #000;
+        padding: 1px;
+        font-size: 18px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0;
+        padding-left: 20px;
+        /* ปรับระยะห่างจากขอบซ้าย */
+        padding-right: 20px;
+        /* ปรับระยะห่างจากขอบขวา */
+    }
+
+    .student-details-box {
+        font-family: 'TH Sarabun New', sans-serif;
+        border: 1px solid #000;
+        padding: 1px;
+        font-size: 18px;
+        margin-top: 0;
+        margin-bottom: 0;
+    }
+
+    .content {
+        position: relative;
+    }
+
+    .table-container {
+        width: calc(100% - 200px);
+        /* Adjust width as needed */
+        float: left;
+    }
+
+    .student-details-box1 {
+        font-family: 'TH Sarabun New', sans-serif;
+        position: absolute;
+        right: 0;
+        /* Aligns with the right edge of the .content container */
+        top: 0;
+        /* Adjust if necessary to align vertically with the table */
+        width: 29.9%;
+        /* Adjust width as needed */
+        border: 1px solid #000;
+        padding: 1px;
+        font-size: 18px;
+        box-sizing: border-box;
+        line-height: 1.1;
+        /* ปรับระยะห่างของบรรทัด */
+    }
+
+    .header-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+
+    .header-table td {
+        padding: 5px;
+        vertical-align: top;
+    }
+
+    .header-table .full-info-cell {
+        font-family: 'TH Sarabun New', sans-serif;
+        padding: 10px;
+        font-size: 14px;
+        text-align: right;
+        border: 1px solid #000;
+        height: 100%;
+    }
+
+    .print-date {
+        font-family: 'TH Sarabun New', sans-serif;
+        text-align: right;
+        font-size: 18px;
+        margin-bottom: 5px;
+        color: #000;
+    }
+
+    .content {
+        margin-top: 10px;
+        display: flex;
+        justify-content: space-between;
+    }
+
+    table {
+        font-family: 'TH Sarabun New', sans-serif;
+        padding: 2px;
+        width: 70%;
+        border-collapse: collapse;
+        margin: 0px;
+        font-size: 18px;
+
+    }
+
+    table th,
+    table td {
+        font-family: 'TH Sarabun New', sans-serif;
+        border: 1px solid #000;
+        padding: 1px;
+        text-align: center;
+        font-size: 18px;
+    }
+
+    table th {
+        background-color: #fff;
+    }
+
+    table td:nth-child(1) {
+        width: 20%;
+    }
+
+    table td:nth-child(2) {
+        width: 75%;
+    }
+
+    table td:nth-child(3),
+    table td:nth-child(4),
+    table td:nth-child(5),
+    table td:nth-child(6),
+    table td:nth-child(7),
+    table td:nth-child(8) {
+        width: 10%;
+    }
+
+    .notes {
+        margin: 20px 0;
+        font-size: 14px;
+        color: #555;
+    }
+
+    .footer {
+        text-align: center;
+        margin-top: 30px;
+        border-top: 2px solid #000;
+        padding-top: 10px;
+    }
+
+    .footer img {
+        height: 100px;
+        display: block;
+        margin: 0 auto;
+    }
+
+    .print-btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 50px;
+        height: 50px;
+        font-size: 24px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        transition: background-color 0.3s ease;
+    }
+
+    .print-btn:hover {
+        background-color: #45a049;
+    }
+
+    .expense-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 1px;
+        /* Adjust spacing as needed */
+        padding: 2px 0;
+        /* Remove the border */
+    }
+
+    .activity-label {
+        font-weight: none;
+        padding-left: 5px;
+    }
+
+    .activity-amount {
+        text-align: right;
+        padding-right: 5px;
+    }
+
+    .summary-amount {
+        padding-right: 5px;
+    }
+
+
+    .expense-summary {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 10px;
+    }
+
+    .expense-summary .summary-label {
+        margin-right: 10px;
+    }
+
+    /* Style the container for the amount in words */
+    /* Style for the summary box */
+    .summary-box {
+        padding: 10px;
+        /* Padding inside the box */
+        background-color: #F5F5F5;
+        /* Light background color */
+        width: fit-content;
+        /* Adjust width based on content */
+        margin: 10px 0;
+        /* Margin for spacing */
+
+        border-radius: 8px;
+        /* Rounded corners */
+    }
+
+    .summary-label1 {
+        font-weight: bold;
+        /* Bold text */
+        /* Make label a block element for separation */
+        margin-bottom: 8px;
+        /* Space between label and content */
+        font-size: 18px;
+        /* Larger font size for emphasis */
+        color: #333;
+        /* Dark text color for better readability */
+    }
+
+    /* Style for the amount in words */
+    .amount-in-words {
+        font-size: 18px;
+        /* Adjust font size as needed */
+        color: #555;
+        /* Slightly lighter text color for better readability */
+        font-weight: bold;
+        text-align: left;
+    }
+
+    .total-amount {
+        font-weight: bold;
+    }
+
+    .card {
+        position: relative;
+        border: 1px solid #ddd;
+        /* เส้นกรอบของ card */
+        padding: 20px;
+        min-height: 300px;
+        /* กำหนดความสูงขั้นต่ำ */
+    }
+
+    .card-body {
+        /* ส่วนเนื้อหาอื่นๆ ของ card */
+    }
+
+    .payment-due {
+        position: absolute;
+        bottom: 45px;
+        left: 0;
+        width: 100%;
+        padding: 10px;
+        border-top: 1px solid #333;
+        background-color: #fff;
+        box-sizing: border-box;
+        margin-bottom: 10px;
+        font-family: 'TH Sarabun New', sans-serif;
+        /* เปลี่ยนฟอนต์ */
+        font-size: 20px;
+        /* กำหนดขนาดฟอนต์ */
+        color: #000;
+        /* กำหนดสีฟอนต์ */
+        /
+    }
+
+    .floating-btn {
+        position: fixed;
+        /* ให้ปุ่มลอย */
+        bottom: 90px;
+        /* ห่างจากขอบล่าง */
+        right: 20px;
+        /* ห่างจากขอบขวา */
+        background-color: #333;
+        /* สีเทาเข้มของปุ่ม */
+        color: #fff;
+        /* สีไอคอน */
+        border: none;
+        padding: 15px;
+        cursor: pointer;
+        font-size: 20px;
+        border-radius: 8px;
+        /* เปลี่ยนให้มุมมน */
+
+        z-index: 1000;
+        /* ทำให้ปุ่มลอยอยู่เหนือองค์ประกอบอื่น */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .floating-btn:hover {
+        background-color: #444;
+        /* สีเมื่อ hover */
+    }
+
+    .icon-options {
+        display: none;
+        flex-direction: column;
+        position: fixed;
+        bottom: 140px;
+        /* ปรับตำแหน่งไอคอนเพิ่มเติม */
+        right: 20px;
+    }
+
+    .icon-options button {
+        background: #333;
+        /* สีเทาเข้มของปุ่มเพิ่มเติม */
+        border: none;
+        color: #fff;
+        /* สีไอคอน */
+        cursor: pointer;
+        font-size: 18px;
+        border-radius: 8px;
+        /* เปลี่ยนให้มุมมน */
+        padding: 10px;
+        margin-bottom: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+    }
+
+    .icon-options button:hover {
+        background-color: #444;
+        /* สีเมื่อ hover */
+    }
+
+    .icon-options i {
+        font-size: 18px;
+    }
+
+    .qr-code {
+        text-align: center;
+    }
+
+    .qr-code-image {
+        max-width: 100px;
+    }
+
+    .text-btn {
+        position: fixed;
+        /* ตำแหน่งคงที่แม้จะเลื่อนหน้าจอ */
+        bottom: 87px;
+        /* ระยะห่างจากขอบล่าง สามารถปรับได้ */
+        right: 65px;
+        /* ระยะห่างจากขอบขวา สามารถปรับได้ */
+        font-weight: bold;
+        background-color: transparent;
+        /* ทำให้ปุ่มไม่มีพื้นหลัง */
+        border: none;
+        /* เอาเส้นขอบออก */
+        color: #333;
+        /* สีของตัวอักษร */
+        font-size: 22px;
+        /* ขนาดตัวอักษร */
+        font-family: 'TH Sarabun New', sans-serif;
+        padding: 10px 20px;
+        /* ระยะห่างภายในปุ่ม */
+        cursor: default;
+        /* ไม่แสดง cursor เป็นคลิก */
+        text-align: center;
+        /* จัดข้อความให้อยู่ตรงกลาง */
+    }
+
+    .text-btn1 {
+        position: fixed;
+        /* ตำแหน่งคงที่แม้จะเลื่อนหน้าจอ */
+        bottom: 18px;
+        /* ระยะห่างจากขอบล่าง สามารถปรับได้ */
+        right: 65px;
+        /* ระยะห่างจากขอบขวา สามารถปรับได้ */
+        font-weight: bold;
+        background-color: transparent;
+        /* ทำให้ปุ่มไม่มีพื้นหลัง */
+        border: none;
+        /* เอาเส้นขอบออก */
+        color: #333;
+        /* สีของตัวอักษร */
+        font-size: 22px;
+        /* ขนาดตัวอักษร */
+        font-family: 'TH Sarabun New', sans-serif;
+        padding: 10px 20px;
+        /* ระยะห่างภายในปุ่ม */
+        cursor: default;
+        /* ไม่แสดง cursor เป็นคลิก */
+        text-align: center;
+        /* จัดข้อความให้อยู่ตรงกลาง */
+    }
+
+    .title-section {
+        display: flex;
+        align-items: center;
+    }
+
+    .logo {
+        width: 90px;
+        /* Adjust the size as needed */
+        height: auto;
+        /* Maintain aspect ratio */
+        margin-right: 5px;
+        /* Space between logo and text (reduced to 5px) */
+    }
+
+    .text-wrapper {
+        flex: 1;
+        /* Take up remaining space */
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        /* Align text to the left */
+    }
+
+    .title {
+        font-size: 1.8rem;
+        /* Adjust as needed */
+        margin: 0;
+        /* Remove default margin */
+    }
+
+    .subtitle {
+        font-size: 1.2rem;
+        /* Adjust as needed */
+        margin: 0;
+        /* Remove default margin */
+    }
+
+    .print-date {
+        margin-top: -50px;
+        /* Adjust this value to move the date upwards */
+        padding: 0;
+        /* Remove any padding */
+        position: relative;
+        /* Ensure positioning allows movement */
+        top: -50px;
+        /* Fine-tune this to move it even closer to the top */
+        text-align: right;
+        /* Align the date to the right */
+    }
+
+    .qr-code {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        /* Center vertically */
+        text-align: center;
+        /* Center the text */
+        gap: 20px;
+        /* Adjust this value for the desired spacing */
+    }
+
+    .qr-code-info {
+        display: flex;
+        flex-direction: column;
+        /* Keep text stacked vertically */
+    }
+
+    .qr-code-image {
+        max-width: 100px;
+        /* Adjust image size as needed */
+    }
+
+    .qr-code-text {
+        margin: 0;
+        /* Removes extra margins if any */
+        line-height: 1.5;
+        /* Adjust line-height if necessary */
+        text-align: left;
+    }
+
+    .button-row {
+        display: flex;
+        gap: 15px;
+        /* เว้นระยะห่างระหว่างปุ่ม */
+        align-items: center;
+        /* จัดตำแหน่งปุ่มให้อยู่ตรงกลางแนวตั้ง */
+    }
+
+    #uploadSlip {
+        padding: 6px;
+        /* กำหนดขนาดปุ่มให้ดูเหมือนปุ่มทั่วไป */
+        cursor: pointer;
+        /* ทำให้ดูเหมือนปุ่มเมื่อ hover */
+        margin-left: 15px;
+        /* เว้นระยะห่างทางซ้ายของปุ่มอัปโหลด */
+    }
+
+    .payment-details {
+        font-family: 'Arial', sans-serif;
+        background-color: #f9f9f9;
+        /* สีพื้นหลังจางๆ */
+        padding: 15px;
+        border-radius: 8px;
+        /* มุมโค้งมน */
+        border: 1px solid #ddd;
+        /* เส้นขอบจางๆ */
+        max-width: 500px;
+        /* ความกว้างของกล่อง */
+        margin: 10px 0;
+    }
+
+    .payment-details p {
+        font-size: 16px;
+        line-height: 1.5;
+        margin: 5px 0;
+    }
+
+    .payment-details .highlight {
+        color: #007bff;
+        /* สีข้อความให้โดดเด่น */
+        font-weight: bold;
+    }
+
+    .payment-details .paid-amount {
+        color: #28a745;
+        /* สีเขียวสำหรับจำนวนที่จ่ายไปแล้ว */
+        font-weight: bold;
+    }
+
+    .payment-details .remaining-amount {
+        color: #dc3545;
+        /* สีแดงสำหรับจำนวนที่เหลือ */
+        font-weight: bold;
+    }
+
+    .button-row {
+        display: flex;
+        gap: 15px;
+        /* เว้นระยะห่างระหว่างปุ่ม */
+        align-items: center;
+        /* จัดตำแหน่งปุ่มให้อยู่ตรงกลางแนวตั้ง */
+    }
+
+    .btn i {
+        margin-right: 8px;
+        /* เพิ่มระยะห่างระหว่างไอคอนกับข้อความ */
+    }
+    </style>
+</head>
+
+<body>
+    <div class="container" id="printableCard">
+        <!-- Title Section -->
+        <div class="title-section">
+            <img src="../assets/dist/img/logoschool.png" alt="วิทยาลัยเทคนิคปักธงชัย" class="logo">
+            <div class="text-wrapper">
+                <div class="title">วิทยาลัยเทคนิคปักธงชัย</div>
+                <div class="subtitle">บัตรลงทะเบียนรายวิชา / ใบแจ้งหนี้ชำระค่าธรรมเนียม</div>
+            </div>
+        </div>
+
+        <!-- Header Section -->
+        <div class="print-date">
+            วันที่พิมพ์: <span id="printDate"></span>
+        </div>
+
+        <!-- Sections -->
+        <div class="header-section">
+            <!-- Section Title Box -->
+            <div class="section-title-box">ส่วนที่ 1 นักเรียน/นักศึกษา</div>
+
+            <!-- Additional Details Box -->
+            <div class="details-box">
+                <div class="id">รหัสประจำตัว: <?php echo $result['รหัสประจำตัว']; ?></div>
+                <div class="phone">โทร: <?php echo $result['เบอร์โทร']; ?></div>
+                <div class="number">เลขที่: <?php echo '190900000000000001'; ?></div>
+            </div>
+            <div class="details-box">
+                <div class="student-info">ชื่อ-นามสกุล: <?php echo $result['ชื่อ-นามสกุล']; ?></div>
+                <div class="class-info">ชั้น: <?php echo $result['ชั้น']; ?></div>
+                <div class="term-info">ภาคเรียนที่: <?php echo $result['ภาคเรียนที่']; ?></div>
+            </div>
+            <div class="details-box">
+                <div class="group-info">กลุ่ม:<?php echo $result['กลุ่มเรียน'] . ' ' . $result['ชื่อกลุ่มเรียน']; ?>
+                </div>
+                <div class="department-info">สาขาวิชา: <?php echo $result['สาขาวิชา']; ?></div>
+                <div class="major-info">สาขางาน: <?php echo $result['สาขางาน']; ?></div>
+            </div>
+            <div class="details-box">
+                <div class="registration-date">วันที่ลงทะเบียน: <?php echo $thaiDate; ?></div>
+                <div class="academic-year">ปีการศึกษา: <?php echo $result['ปีการศึกษา']; ?></div>
+            </div>
+
+            <!-- Content Section -->
+            <div class="content">
+                <!-- Payment Details Section -->
+                <table id="paymentTable">
+                    <thead>
+                        <tr>
+                            <th>รหัสวิชา</th>
+                            <th>รายวิชา</th>
+                            <th>ช.</th>
+                            <th>ท.</th>
+                            <th>ป.</th>
+                            <th>น.</th>
+                            <th>คน.</th>
+                            <th>คป.</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($subjectDetails as $subject): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($subject['รหัสวิชา']); ?></td>
+                            <td class="text-left"><?php echo htmlspecialchars($subject['รายวิชา']); ?></td>
+                            <td class="ch"><?php echo htmlspecialchars($subject['ชั่วโมงเรียนทั้งหมด']); ?></td>
+                            <td class="th"><?php echo htmlspecialchars($subject['ชั่วโมงทฤษฎี']); ?></td>
+                            <td class="pa"><?php echo htmlspecialchars($subject['ชั่วโมงปฎิบัติ']); ?></td>
+                            <td class="no"><?php echo htmlspecialchars($subject['จำนวนหน่วยกิต']); ?></td>
+                            <td class="kan"><?php echo htmlspecialchars($subject['ค่าลงทะเบียนเรียนรายวิชา']); ?></td>
+                            <td class="kp"><?php echo htmlspecialchars($subject['ค่าวัสดุฝึกภาคปฏิบัติ']); ?></td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="2">รวม</td>
+                            <td id="totalCh">0</td>
+                            <td id="totalTh">0</td>
+                            <td id="totalPa">0</td>
+                            <td id="totalNo">0</td>
+                            <td id="totalKan">0</td>
+                            <td id="totalKp">0</td>
+                        </tr>
+                        <div class="student-details-box1">
+                            <div class="expense-item">
+                                <span class="activity-label">ค่าขึ้นทะเบียนเป็นนักศึกษา</span>
+                                <span class="activity-amount">100 บาท</span>
+                            </div>
+                            <div class="expense-item">
+                                <span class="activity-label">ค่าบัตรประจําตัวนักศึกษา</span>
+                                <span class="activity-amount">100 บาท</span>
+                            </div>
+                            <div class="expense-item">
+                                <span class="activity-label">ค่าใช้บริการอินเทอร์เน็ต</span>
+                                <span class="activity-amount">250 บาท</span>
+                            </div>
+                            <div class="expense-item">
+                                <span class="activity-label">ค่ากิจกรรม</span>
+                                <span class="activity-amount">100 บาท</span>
+                            </div>
+                            <div class="expense-item">
+                                <span class="activity-label">ค่าตรวจสุขภาพ</span>
+                                <span class="activity-amount">200 บาท</span>
+                            </div>
+
+                            <div class="expense-item">
+                                <span class="activity-label">ค่าเข้าค่ายคุณธรรม</span>
+                                <span class="activity-amount">250 บาท</span>
+                            </div>
+                            <div class="expense-item">
+                                <span class="activity-label">ค่ารักษาสภาพสิ่งแวดล้อม</span>
+                                <span class="activity-amount">100 บาท</span>
+                            </div>
+
+                            <div class="expense-item">
+                                <span class="activity-label">ค่าบำรุงห้องสมุด</span>
+                                <span class="activity-amount">50 บาท</span>
+                            </div>
+                            <div class="expense-item">
+                                <span class="activity-label">ค่าประกันอุบัติเหตุ</span>
+                                <span class="activity-amount">220 บาท</span>
+                            </div>
+
+                            <div class="expense-item">
+                                <span class="activity-label">ค่าสมัคร</span>
+                                <span class="activity-amount">50 บาท</span>
+                            </div>
+
+                            <div class="expense-item">
+                                <span class="activity-label">ค่าลงทะเบียนรายวิชา</span>
+                                <span class="activity-amount" id="registrationFeeAmount">0 บาท</span>
+                            </div>
+                            <div class="expense-item">
+                                <span class="activity-label">ค่าวัสดุฝึกภาคปฏิบัติ</span>
+                                <span class="activity-amount" id="practicalMaterialsFeeAmount">0 บาท</span>
+                            </div>
+                            <!-- Summary Section -->
+                            <div class="expense-summary">
+                                <span class="summary-label">รวมเงิน</span>
+                                <span class="summary-amount" id="total-amount"></span>
+                            </div>
+                            <div class="expense-summary">
+                                <span class="summary-label">ค่าปรับ</span>
+                                <span class="summary-amount" id="penalty-amount">0.00 บาท</span>
+                            </div>
+                            <div class="expense-summary total-amount">
+                                <span class="summary-label">รวมเงินทั้งสิ้น</span>
+                                <span class="summary-amount" id="final-amount"></span>
+                            </div>
+
+                            <div class="summary-box">
+                                <span class="summary-label1">จำนวนเงินตัวอักษร</span>
+                                <div class="amount-in-words" id="amount-in-words"></div>
+                            </div>
+
+                        </div>
+
+                    </tfoot>
+                </table>
+
+            </div>
+            <!-- Section After Table -->
+            <div class="payment-due">
+                <div class="due-date1">
+                    ชำระเงินภายในวันที่: <span id="dueDate">31/12/2567</span>
+                </div>
+
+                <div class="qr-code">
+                    <img src="../assets/dist/img/qr.png" alt="QR Code" class="qr-code-image">
+                    <div class="qr-code-info">
+                        <p class="qr-code-text">เลขบัญชีธนาคาร 928-4237376</p>
+                        <p class="qr-code-text">วิทยาลัยเทคนิคปักธงชัย</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
     </div>
-    <!-- /.content-header -->
 
-    <!-- Image placed below date and time -->
-    <div class="text-center mb-4">
-        <img src="../assets/dist/img/header.png" alt="Header Image" style="max-width: 100%; height: auto;">
+    <!-- Print Button -->
+    <button class="print-btn" onclick="printCard()">
+        <i class="fas fa-print"></i>
+    </button>
+
+    <!-- Floating Action Button -->
+    <!-- Floating Action Button -->
+    <button class="floating-btn" onclick="toggleIcons()">
+        <i class="fas fa-credit-card"></i> <!-- ไอคอนหลัก -->
+    </button>
+
+    <!-- Payment Options -->
+    <div class="icon-options" id="iconOptions">
+        <button onclick="printCard()">
+            <i class="fas fa-cash-register"></i> ชำระเงินสด
+        </button>
+        <button onclick="selectPayment('outstanding')">
+            <i class="fas fa-credit-card"></i> ผ่อนชำระ
+        </button>
+        <button onclick="printCard()">
+            <i class="fas fa-university"></i> โอนผ่านธนาคาร
+        </button>
+
     </div>
+    <span class="text-btn">
+        เลือกวิธีการชำระเงิน
+        <!-- เปลี่ยนจากไอคอนเป็นตัวอักษร -->
+    </span>
 
-    <!-- Main content -->
-    <section class="content">
-        <div class="container-fluid">
-            <!-- Small boxes (Stat box) -->
-            <div class="row">
-                <!-- Small boxes (statistic) -->
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-success">
-                        <div class="inner">
-                            <h3 id="total-deposits" class="large-text">0</h3>
-                            <p class="medium-text">จำนวนนักศึกษาทั้งหมด(คน)</p>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-user-graduate"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-danger">
-                        <div class="inner">
-                            <h3 id="total-withdrawals" class="large-text">0</h3>
-                            <p class="medium-text">จำนวนนักศึกษาลงทะเบียน(คน)</p>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-clipboard-list"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-warning">
-                        <div class="inner">
-                            <h3 id="total-borrowings" class="large-text">0</h3>
-                            <p class="medium-text">จำนวนนักศึกษาชำระเงิน(คน)</p>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-money-check-alt"></i>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-6">
-                    <div class="small-box bg-info">
-                        <div class="inner">
-                            <h3 id="total-balance" class="large-text">0</h3>
-                            <p class="medium-text">จำนวนเงินชำระค่าเทอม(บาท)</p>
-                        </div>
-                        <div class="icon">
-                            <i class="fas fa-dollar-sign"></i>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <span class="text-btn1">
+        กรุณากดพิมใบเสร็จ
+        <!-- เปลี่ยนจากไอคอนเป็นตัวอักษร -->
+    </span>
 
-            <!-- Statistics Section with Chart.js -->
-            <div class="container-fluid mt-4">
-                <div class="row">
-                    <!-- First chart -->
-                    <div class="col-lg-6 col-md-12">
-                        <div class="card" style="height: 100%;">
-                            <div class="card-body">
-                                <h3 class="card-title text-center" id="studentChartTitle">กราฟจำนวนนักศึกษาลงทะเบียน
-                                </h3><br><br>
+    <!-- JavaScript -->
+    <script>
+    window.onload = function() {
+        // Calculate totals for expense items
+        let total = 0;
+        let penalty = parseFloat(document.getElementById('penalty-amount').textContent.replace(' บาท', '').replace(
+            ',', ''));
 
-                                <!-- Dropdown for academic year -->
-                                <label for="academicYear"> เลือกปีการศึกษา:</label>
-                                <select id="academicYear" onchange="updateChart()">
-                                    <option value="2567">2567</option>
-                                    <option value="2568">2568</option>
-                                    <option value="2569">2569</option>
-                                </select>
-                                <canvas id="studentChart" style="width: 100%; height: 400px;"></canvas>
-                            </div>
-                        </div>
-                    </div>
+        // Calculate the sum of all expense amounts
+        document.querySelectorAll('.expense-item .activity-amount').forEach(function(element) {
+            total += parseFloat(element.textContent.replace(' บาท', '').replace(',', ''));
+        });
 
-                    <!-- Second chart -->
-                    <div class="col-lg-6 col-md-12">
-                        <div class="card" style="height: 100%;">
-                            <div class="card-body">
-                                <h5 class="card-title text-center">กราฟการชำระค่าเทอม</h5><br><br><br>
-                                <canvas id="paymentChart" style="width: 100%; height: 400px;"></canvas>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        // Update the total amount
+        document.getElementById('total-amount').textContent = total.toFixed(2) + ' บาท';
 
-            <!-- Summary Card for Recent Activities -->
-            <div class="row">
-                <div class="col-lg-12">
-                    <div class="card" style="margin-top: 30px;">
-                        <div class="card-header">
-                            <h3 class="card-title">
-                                ข้อมูลการชำระเงิน
-                                ภาคเรียนที่
-                                <select id="termDropdown" class="form-select" style="display:inline-block; width:auto;">
-                                    <option value="1">1</option>
-                                    <option value="2">2</option>
-                                </select>
-                                ปีการศึกษา
-                                <select id="yearDropdown" class="form-select" style="display:inline-block; width:auto;">
-                                    <option value="2567">2567</option>
-                                    <option value="2568">2568</option>
-                                    <option value="2569">2569</option>
-                                    <option value="2570">2570</option>
-                                </select>
-                            </h3>
-                        </div>
-                        <div class="card-body">
-                            <div class="row text-center">
-                                <div class="col-md-4">
-                                    <h5 class="font-weight-bold" style="color: rgba(255, 99, 132, 1);">
-                                        จำนวนนักศึกษาที่โอนผ่านธนาคาร</h5>
-                                    <h3 id="recent-deposits" class="font-size-lg">0 คน</h3>
-                                </div>
-                                <div class="col-md-4">
-                                    <h5 class="font-weight-bold" style="color: rgba(54, 162, 235, 1);">
-                                        จำนวนนักศึกษาที่ผ่อนชำระ</h5>
-                                    <h3 id="recent-withdrawals" class="font-size-lg">0 คน</h3>
-                                </div>
-                                <div class="col-md-4">
-                                    <h5 class="font-weight-bold" style="color: rgba(0, 128, 0, 1);">
-                                        จำนวนนักศึกษาที่ชำระเงินสด</h5>
-                                    <h3 id="recent-borrowings" class="font-size-lg">0 คน</h3>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+        // Calculate and update the final amount (รวมเงิน + ค่าปรับ)
+        let finalAmount = total + penalty;
+        document.getElementById('final-amount').textContent = finalAmount.toFixed(2) + ' บาท';
 
+        // Set the print date dynamically with time
+        document.getElementById('printDate').textContent = new Date().toLocaleString('th-TH', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
 
-            <!-- /.content-wrapper -->
+        // Calculate totals for table columns
+        function calculateTotals() {
+            const rows = document.querySelectorAll('#paymentTable tbody tr');
+            let totalCh = 0,
+                totalTh = 0,
+                totalPa = 0,
+                totalNo = 0,
+                totalKan = 0,
+                totalKp = 0;
 
-            <!-- Add this script tag at the end of your body tag -->
-            <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-            <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-            <script>
-            // Data and functions for the page
-
-            // Format date in Thai
-            function formatDateThai(date) {
-                const monthsThai = [
-                    "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-                    "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
-                ];
-                const day = date.getDate();
-                const month = monthsThai[date.getMonth()];
-                const year = date.getFullYear() + 543; // Convert to Buddhist year
-                const hours = date.getHours().toString().padStart(2, '0');
-                const minutes = date.getMinutes().toString().padStart(2, '0');
-                const seconds = date.getSeconds().toString().padStart(2, '0');
-                return `${day} ${month} ${year} ${hours}:${minutes}:${seconds}`;
-            }
-
-            function updateDateTime() {
-                const now = new Date();
-                document.getElementById('currentDateTime').innerText = formatDateThai(now);
-            }
-
-            // Update date and time every second
-            setInterval(updateDateTime, 1000);
-            // Set initial date and time
-            updateDateTime();
-
-            // Create initial student chart
-            const registrationData = {
-                '2567': {
-                    '1': [0, 0, 0, 0, 0], // Placeholder data
-                    '2': [0, 0, 0, 0, 0] // Placeholder data
-                }
-            };
-
-            // Create student chart
-            const ctx = document.getElementById('studentChart').getContext('2d');
-            const studentChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: ['ปวช.1', 'ปวช.2', 'ปวช.3', 'ปวส.1', 'ปวส.2'],
-                    datasets: [{
-                        label: 'ภาคเรียนที่ 1',
-                        data: registrationData['2567']['1'],
-                        backgroundColor: 'rgba(255, 45, 33, 0.6)',
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        borderWidth: 1
-                    }, {
-                        label: 'ภาคเรียนที่ 2',
-                        data: registrationData['2567']['2'],
-                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'ระดับชั้นปี'
-                            }
-                        },
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'นักศึกษา (คน)'
-                            },
-                            suggestedMax: Math.max(...registrationData['2567']['1'], ...registrationData['2567']
-                                ['2']) + 9
-                        }
-                    }
-                }
+            rows.forEach(row => {
+                totalCh += parseFloat(row.querySelector('.ch').textContent) || 0;
+                totalTh += parseFloat(row.querySelector('.th').textContent) || 0;
+                totalPa += parseFloat(row.querySelector('.pa').textContent) || 0;
+                totalNo += parseFloat(row.querySelector('.no').textContent) || 0;
+                totalKan += parseFloat(row.querySelector('.kan').textContent) || 0;
+                totalKp += parseFloat(row.querySelector('.kp').textContent) || 0;
             });
 
-            // Update chart function
-            function updateChart() {
-                const selectedYear = document.getElementById('academicYear').value;
+            document.getElementById('totalCh').textContent = totalCh;
+            document.getElementById('totalTh').textContent = totalTh;
+            document.getElementById('totalPa').textContent = totalPa;
+            document.getElementById('totalNo').textContent = totalNo;
+            document.getElementById('totalKan').textContent = totalKan;
+            document.getElementById('totalKp').textContent = totalKp;
 
-                // AJAX request to fetch data
-                $.getJSON(`../fetch/total_registered_students.php?school_year=${selectedYear}`, function(data) {
-                    // Update chart data
-                    studentChart.data.datasets[0].data = data['1']; // Data for Semester 1
-                    studentChart.data.datasets[1].data = data['2']; // Data for Semester 2
-                    studentChart.options.plugins.title.text =
-                        `กราฟนักศึกษาลงทะเบียน ปีการศึกษา ${selectedYear}`;
-                    studentChart.update();
+            // Debugging: Print totals
+            console.log('Totals:', {
+                totalCh,
+                totalTh,
+                totalPa,
+                totalNo,
+                totalKan,
+                totalKp
+            });
+
+            // Update registration fee and practical materials fee
+            document.getElementById('registrationFeeAmount').textContent = totalKan.toFixed(2) + ' บาท';
+            document.getElementById('practicalMaterialsFeeAmount').textContent = totalKp.toFixed(2) + ' บาท';
+
+            // Update the total amount to include registration fee and practical materials fee
+            const registrationFee = parseFloat(totalKan) || 0;
+            const practicalMaterialsFee = parseFloat(totalKp) || 0;
+            total += registrationFee + practicalMaterialsFee;
+            document.getElementById('total-amount').textContent = total.toFixed(2) + ' บาท';
+
+            // Update the final amount (รวมเงิน + ค่าปรับ)
+            let finalAmount = total + penalty;
+            document.getElementById('final-amount').textContent = finalAmount.toFixed(2) + ' บาท';
+
+            // Convert final amount to Thai words and update the element
+            document.getElementById('amount-in-words').textContent = numberToThaiWords(finalAmount);
+            let formData = new FormData();
+            formData.append('total_money', finalAmount);
+            formData.append('penalty', penalty);
+
+            // ส่งค่าไปยัง PHP โดยใช้ fetch โดยไม่แสดงผลกลับมา
+            fetch('', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    // ถ้าไม่ต้องการแสดงผล ทำเพียงแค่ console.log เพื่อดูสถานะการตอบกลับ
+                    console.log('Data sent to PHP successfully');
+                })
+                .catch(error => {
+                    console.error('Error:', error);
                 });
+        }
+
+        // Call the function to calculate totals for the table columns
+        calculateTotals();
+    }
+
+    // Function to print the card
+    function printCard() {
+        const element = document.getElementById('printableCard');
+        const options = {
+            margin: 1,
+            filename: 'tuition_payment.pdf',
+            image: {
+                type: 'jpeg',
+                quality: 2.0
+            },
+            html2canvas: {
+                scale: 4
+            }, // Scale to ensure better quality
+            jsPDF: {
+                unit: 'mm',
+                format: 'a4',
+                orientation: 'portrait'
             }
+        };
+        html2pdf().from(element).set(options).save();
+    }
 
-            // Event listener for dropdown change
-            document.getElementById('academicYear').addEventListener('change', updateChart);
+    // Function to convert number to Thai words
+    function numberToThaiWords(number) {
+        const units = ['', 'หนึ่ง', 'สอง', 'สาม', 'สี่', 'ห้า', 'หก', 'เจ็ด', 'แปด', 'เก้า'];
+        const places = ['', 'สิบ', 'ร้อย', 'พัน', 'หมื่น', 'แสน', 'ล้าน'];
 
-            // Initial chart load
-            updateChart();
-            // Create payment chart
-            document.addEventListener('DOMContentLoaded', function() {
-                fetch('../fetch/fetch_tuition_payment.php')
-                    .then(response => response.json())
-                    .then(data => {
-                       // หากข้อมูลว่าง ให้แสดงปีปัจจุบันและอีก 3 ปีถัดไป
-                        const currentYear = new Date().getFullYear() + 543; // ปีปัจจุบันของไทย
-                        const labels = data.length > 0 ? data.map(item => item.school_year) : [currentYear, currentYear + 1, currentYear + 2, currentYear + 3];
-                        const bankTransferData = data.length > 0 ? data.map(item => item.bank_transfer) : [0, 0, 0, 0];
-                        const installmentPaymentData = data.length > 0 ? data.map(item => item.installment_payment) : [0, 0, 0, 0];
-                        const cashPaymentData = data.length > 0 ? data.map(item => item.cash_payment) : [0, 0, 0, 0];
+        if (number === 0) return 'ศูนย์บาท';
 
-                        // หาค่าสูงสุด หากไม่มีข้อมูล ให้ใช้ 10,000 บาทเป็นค่าสูงสุด
-                        const allData = [...bankTransferData, ...installmentPaymentData, ...cashPaymentData];
-                        const maxValue = Math.max(...allData);
-                        const maxY = allData.length > 0 ? Math.ceil((maxValue + 500)/1000) * 1000 : 10000; // Set maximum value
+        let words = '';
+        let i = 0;
 
-                        // Create the chart
-                        const ctx = document.getElementById('paymentChart').getContext('2d');
-                        new Chart(ctx, {
-                            type: 'line',
-                            data: {
-                                labels: labels,
-                                datasets: [{
-                                        label: 'โอนผ่านธนาคาร',
-                                        data: bankTransferData,
-                                        backgroundColor: 'rgba(255, 99, 132, 0.7)',
-                                        borderColor: 'rgba(255, 99, 132, 1)',
-                                        borderWidth: 1
-                                    },
-                                    {
-                                        label: 'ผ่อนชำระ',
-                                        data: installmentPaymentData,
-                                        backgroundColor: 'rgba(54, 162, 235, 0.7)',
-                                        borderColor: 'rgba(54, 162, 235, 1)',
-                                        borderWidth: 1
-                                    },
-                                    {
-                                        label: 'ชำระเงินสด',
-                                        data: cashPaymentData,
-                                        backgroundColor: 'rgba(0, 255, 0, 0.7)',
-                                        borderColor: 'rgba(0, 255, 0, 1)',
-                                        borderWidth: 1
-                                    }
-                                ]
-                            },
-                            options: {
-                                scales: {
-                                    x: {
-                                        title: {
-                                            display: true,
-                                            text: 'ปีการศึกษา'
-                                        }
-                                    },
-                                    y: {
-                                        beginAtZero: true,
-                                        max: maxY, 
-                                        title: {
-                                            display: true,
-                                            text: 'จำนวนเงิน(บาท)'
-                                        }
-                                    }
-                                }
-                            }
-                        });
-                    })
-                    .catch(error => console.error('Error fetching data:', error));
-            });
+        if (number < 10) {
+            return units[number] + 'บาทถ้วน';
+        }
 
-            // Fetch and update statistics
-            $(document).ready(function() {
-                $.getJSON('../fetch/fetch_values_data.php', function(data) {
-                    $('#total-deposits').text(Number(data.total_students).toLocaleString());
-                    $('#total-withdrawals').text(Number(data.total_registered_students)
-                        .toLocaleString());
-                    $('#total-borrowings').text(Number(data.total_students_paid).toLocaleString());
-                    $('#total-balance').text(Number(data.total_tuition_paid).toLocaleString());
-                });
-            });
+        while (number > 0) {
+            let part = number % 10;
+            if (i === 1 && part === 2) {
+                words = 'ยี่สิบ' + words;
+            } else if (i === 1 && part !== 0) {
+                words = units[part] + 'สิบ' + words;
+            } else if (part !== 0) {
+                words = units[part] + places[i] + words;
+            }
+            number = Math.floor(number / 10);
+            i++;
+        }
 
-            $(document).ready(function() {
-                function fetchStatistics(semester, school_year) {
-                    $.post('../fetch/payment_information.php', {
-                        semester: semester,
-                        school_year: school_year
-                    }, function(data) {
-                        if (!data.error) {
-                            $('#recent-deposits').text(Number(data.bank_transfer).toLocaleString() +
-                                ' คน');
-                            $('#recent-withdrawals').text(Number(data.installment_payment)
-                                .toLocaleString() + ' คน');
-                            $('#recent-borrowings').text(Number(data.cash_payment).toLocaleString() +
-                                ' คน');
-                        } else {
-                            console.error(data.error);
-                        }
-                    }, 'json');
+        return words + 'บาทถ้วน';
+    }
+
+    // Examples
+    console.log(numberToThaiWords(20));
+    console.log(numberToThaiWords(123));
+    console.log(numberToThaiWords(1000));
+    console.log(numberToThaiWords(12345));
+
+    function toggleIcons() {
+        const icons = document.getElementById('iconOptions');
+        icons.style.display = icons.style.display === 'none' ? 'flex' : 'none';
+    }
+
+    function option1() {
+        alert('Option 1 selected');
+    }
+
+    function option2() {
+        alert('Option 2 selected');
+    }
+
+    function option3() {
+        alert('Option 3 selected');
+    }
+
+    function selectPayment(paymentType) {
+        document.getElementById('installmentModal').style.display = 'block';
+    }
+
+    // เรียกใช้งานฟังก์ชันในที่ที่ต้องการ เช่น การเริ่มต้น
+    updateRemainingAmount();
+    updateRemainingInstallments();
+
+    function selectPayment(type) {
+    if (type === 'outstanding') {
+        let finalAmount = parseFloat(document.getElementById('final-amount').textContent.replace(' บาท', '').replace(',', ''));
+
+        Swal.fire({
+            title: 'รายละเอียดการผ่อนชำระ',
+            html: `
+            <div class="payment-details">
+                    <p><strong>ผ่อนจำนวน 3 งวด</strong></p>
+                    <p>จำนวนเงินค่าเทอมทั้งหมด <span class="highlight" >${finalAmount.toFixed(2)} บาท</span></p>
+                    <p>จำนวนที่จ่ายไปแล้ว <span class="paid-amount">1,000 บาท</span> &nbsp;|&nbsp; คงเหลือ <span class="remaining-amount">${(finalAmount - 1000).toFixed(2)} บาท</span></p>
+            </div>
+            <hr>
+            <p>ผ่อนงวดที่ 1</p>
+            <label>จำนวนเงิน</label>
+            <input type="number" id="paymentAmount" class="swal2-input" placeholder="กรอกจำนวนเงิน">
+            <hr>
+            <p>วันครบกำหนดชำระ: 30 กันยายน 2567</p>
+            <p>สถานะการชำระเงิน : ไม่สำเร็จ</p>
+           <div class="button-row">
+            <!-- ปุ่มดาวน์โหลดพร้อมไอคอน -->
+            <a href="##" class="btn btn-primary">
+                <i class="fas fa-download"></i> ใบชำระค่าเทอมผ่อนชำระงวดที่ 1
+            </a>
+
+            <!-- ปุ่มแนบสลิปพร้อมข้อความและไอคอน -->
+            <label for="uploadSlip" class="btn btn-success">
+                <i class="fas fa-paperclip"></i> แนบสลิปการชำระเงิน
+            </label>
+            <input type="file" id="uploadSlip" accept="image/*,application/pdf" style="display: none;">
+        </div>
+
+        <!-- เพิ่มการใช้งาน Font Awesome -->
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+        `,
+            confirmButtonText: 'บันทึก',
+            showCancelButton: true,
+            cancelButtonText: 'ยกเลิก',
+            preConfirm: () => {
+                const paymentAmount = document.getElementById('paymentAmount').value;
+                const slipFile = document.getElementById('uploadSlip').files[0];
+
+                if (!paymentAmount) {
+                    Swal.showValidationMessage('กรุณากรอกจำนวนเงิน');
+                } else if (!slipFile) {
+                    Swal.showValidationMessage('กรุณาแนบสลิปการชำระเงิน');
+                } else {
+                    return {
+                        paymentAmount,
+                        slipFile
+                    };
                 }
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                console.log('จำนวนเงินที่กรอก:', result.value.paymentAmount);
+                console.log('ไฟล์สลิป:', result.value.slipFile);
+                // ส่งข้อมูลการชำระเงินและไฟล์สลิปไปยังระบบ
+            }
+        });
+    }
+}
 
-                // Call fetchStatistics when the page loads with default values
-                fetchStatistics($('#termDropdown').val(), $('#yearDropdown').val());
+    </script>
+</body>
 
-                // Add event listeners for the dropdowns
-                $('#termDropdown, #yearDropdown').change(function() {
-                    const semester = $('#termDropdown').val();
-                    const school_year = $('#yearDropdown').val();
-                    fetchStatistics(semester, school_year);
-                });
-            });
-            </script>
-        </div><!-- /.container-fluid -->
-    </section><!-- /.content -->
-</div><!-- /.content-wrapper -->
+</html>
